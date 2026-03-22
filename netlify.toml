@@ -1,0 +1,17 @@
+[build]
+  base = "CreditRoot"
+  publish = "CreditRoot/dist"
+  command = "npm run build"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/cetes-rate"
+  to = "/.netlify/functions/cetes-rate"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
