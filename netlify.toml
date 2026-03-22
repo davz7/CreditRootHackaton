@@ -1,7 +1,6 @@
 [build]
-  base = "CreditRoot"
+  command = "cd CreditRoot && npm run build"
   publish = "CreditRoot/dist"
-  command = "npm run build"
 
 [functions]
   directory = "netlify/functions"
