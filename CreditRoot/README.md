@@ -1,16 +1,83 @@
-# React + Vite
+# CreditRoot — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the MananaSeguro retirement savings platform, built on the Stellar blockchain with Etherfuse StableBond integration.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+CreditRoot is the web interface for MananaSeguro — a pension/retirement savings product targeting Mexican workers. It connects to the Stellar network via the Freighter wallet and uses Etherfuse StableBonds as the savings instrument.
 
-## React Compiler
+## Folder Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src/
+├── app/                    # Shell layout and navigation config
+├── assets/                 # Static images and SVGs
+├── components/
+│   ├── common/             # Reusable UI primitives (MetricCard, RateBadge, SectionCard, SectionHeading)
+│   └── layout/             # AppHeader and AppFooter
+├── data/                   # Static content (retirementContent.js)
+├── features/               # Feature modules (each owns its components)
+│   ├── access/             # Wallet connect flow (ConnectAccountCard)
+│   ├── dashboard/          # Dashboard widgets (AutoloanCard, ContributionHistory, RetirementSnapshot)
+│   ├── planner/            # Contribution planner (ContributionPlanner)
+│   ├── referrals/          # Referral module (ReferralModule)
+│   ├── simulator/          # Carlos simulator (CarlosSimulator)
+│   └── withdrawal/         # Withdrawal flow (WithdrawalFlow)
+├── hooks/                  # Custom React hooks
+│   ├── useEtherfuseRate.js         # Fetches live StableBond yield rate
+│   └── useRetirementProjection.js  # Calculates retirement projections
+├── lib/                    # Third-party integrations
+│   ├── stellar.js          # Stellar SDK helpers
+│   └── wallet.js           # Freighter wallet connection utilities
+├── screens/                # Full-page views
+│   ├── LandingScreen.jsx
+│   ├── AuthScreen.jsx
+│   ├── HomeScreen.jsx
+│   ├── DashboardScreen.jsx
+│   ├── PlannerScreen.jsx
+│   ├── WithdrawalScreen.jsx
+│   └── components/         # Landing-specific sections (stats, testimonials, calculator, CTA)
+└── utils/
+    ├── formatters.js       # Date and currency formatters
+    └── projections.js      # Projection calculation helpers
+```
 
-## Expanding the ESLint configuration
+## Local Setup
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+**Requirements:** Node.js 18+, npm 9+
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start the development server
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser.
+
+> To test wallet flows, install the [Freighter browser extension](https://www.freighter.app/) and connect to Stellar Testnet.
+
+## Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start Vite dev server with HMR |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run ESLint |
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/main.jsx` | Application entry point |
+| `src/App.jsx` | Root component, router setup |
+| `src/app/AppShell.jsx` | Main layout wrapper (nav + page content) |
+| `src/app/navigation.js` | Route and navigation definitions |
+| `src/lib/stellar.js` | Stellar network helpers (send, fetch balance) |
+| `src/lib/wallet.js` | Freighter wallet connection logic |
+| `src/hooks/useEtherfuseRate.js` | Live yield rate from Etherfuse API |
+| `src/hooks/useRetirementProjection.js` | Core retirement math |
+| `src/utils/formatters.js` | Currency (MXN/USD) and date formatters |
+| `vite.config.js` | Vite build configuration |
