@@ -132,6 +132,20 @@ export function RetirementSnapshot() {
           border-radius: 6px;
           animation: skeleton-pulse 1.6s ease-in-out infinite;
         }
+        .tab-scroll-wrap { position: relative; }
+        .tab-scroll-wrap::after {
+          content: '';
+          position: absolute;
+          top: 0; right: 0;
+          width: 48px; height: 100%;
+          background: linear-gradient(to right, transparent, #050505);
+          pointer-events: none;
+        }
+        .tab-scroll {
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .tab-scroll::-webkit-scrollbar { display: none; }
       `}</style>
 
       <div className="mb-4">
@@ -224,7 +238,8 @@ export function RetirementSnapshot() {
             </div>
           </div>
 
-          <div role="tablist" className="d-flex gap-2 mb-4 pb-1" style={{ overflowX: 'auto', flexWrap: 'nowrap' }} aria-label="Dashboard sections">
+          <div className="tab-scroll-wrap mb-4">
+          <div role="tablist" className="tab-scroll d-flex gap-2 pb-1" style={{ flexWrap: 'nowrap' }} aria-label="Dashboard sections">
             {tabs.map((t, index) => (
               <button key={t.key}
                 id={`tab-${t.key}`}
@@ -244,6 +259,7 @@ export function RetirementSnapshot() {
                 {t.label}
               </button>
             ))}
+          </div>
           </div>
 
           {activeTab === 'resumen' && (
