@@ -1,6 +1,6 @@
 import pytest
 
-from bot import calcular_proyeccion
+from core.proyecciones import calcular_proyeccion
 
 
 def test_carlos_scenario_projection_is_stable():
