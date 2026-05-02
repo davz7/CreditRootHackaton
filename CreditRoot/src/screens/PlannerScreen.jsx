@@ -5,24 +5,29 @@ export function PlannerScreen() {
   const { userRate, loading } = useEtherfuseRate()
 
   return (
-    <section id="proyeccion" className="py-5"
-      style={{ backgroundColor: '#050505', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
-      <div className="container py-4">
+    <section className="bg-surface py-16 lg:py-24">
+      <div className="container mx-auto px-4">
 
-        <div className="badge rounded-pill px-3 py-2 mb-3"
-          style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#f59e0b', border: '1px solid rgba(59,130,246,0.2)' }}>
-          Simulador · Mañana Seguro
-        </div>
-        <h2 className="fw-bold mb-2" style={{ letterSpacing: '-2px' }}>¿Cuánto puedes ahorrar?</h2>
-        <p className="text-white-50 mb-5">
-          Desde $2 USDC, con rendimiento Etherfuse al{' '}
-          <span style={{ color: '#22c55e', fontWeight: 700 }}>
-            {loading ? '...' : `${userRate}%`}
+        <div className="mb-8 anim-fade-up-1">
+          <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide mb-4">
+            Simulador · Mañana Seguro
           </span>
-          {' '}e incentivos cada 5 años. Así crece tu retiro con constancia.
-        </p>
+          <h2 className="font-display font-black text-ink tracking-tight mb-2"
+            style={{ fontSize: 'clamp(2rem,4vw,2.8rem)', lineHeight: 1.05 }}>
+            ¿Cuánto puedes ahorrar?
+          </h2>
+          <p className="text-ink/50 text-lg max-w-xl">
+            Desde $2 USDC, con rendimiento Etherfuse al{' '}
+            <span className="text-green-600 font-bold">
+              {loading ? '...' : `${userRate}%`}
+            </span>
+            {' '}e incentivos cada 5 años. Así crece tu retiro con constancia.
+          </p>
+        </div>
 
-        <ContributionPlanner />
+        <div className="anim-fade-up-2">
+          <ContributionPlanner />
+        </div>
 
       </div>
     </section>

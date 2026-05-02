@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 function cetesRatePlugin() {
   return {
@@ -27,6 +28,14 @@ function cetesRatePlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), cetesRatePlugin()],
-  test: { environment: 'jsdom' },
+  plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api.etherfuse.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      }
+    }
+  }
 })

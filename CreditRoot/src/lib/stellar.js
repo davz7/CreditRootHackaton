@@ -4,7 +4,6 @@ const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.or
 export const networkPassphrase = StellarSdk.Networks.TESTNET
 const rpc = new StellarSdk.rpc.Server("https://soroban-testnet.stellar.org")
 
-// ⚠️ Actualiza este ID después de desplegar el contrato nuevo
 export const CONTRACT_ID = "CA4M25CNPPXIPLXZLJZQBPAOKY5REKUOFNJVTMGJ4RKK4QYNIYIG6NLP"
 
 // USDC en Stellar testnet (Circle testnet issuer)

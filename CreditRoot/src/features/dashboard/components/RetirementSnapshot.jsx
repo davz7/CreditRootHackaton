@@ -15,19 +15,27 @@ export function RetirementSnapshot() {
   const [balances, setBalances] = useState(null)
   const [address, setAddress] = useState(null)
   const [fechaRetiro, setFechaRetiro] = useState(null)
-  // ─── Datos reales del contrato Soroban ───────────────────────────────────────
-  const [lockedBalance, setLockedBalance] = useState(0)   // saldo real bloqueado en contrato
-  const [meta, setMeta] = useState(10000)                  // meta real del contrato
-  const [depositCount, setDepositCount] = useState(0)      // depósitos reales on-chain
-  // ────────────────────────────────────────────────────────────────────────────
+  const [lockedBalance, setLockedBalance] = useState(0)
+  const [meta, setMeta] = useState(10000)
+  const [depositCount, setDepositCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('resumen')
 
-  const { cetesRate, userRate, platformRate, isLive } = useEtherfuseRate()
+  const { cetesRate, userRate, platformRate } = useEtherfuseRate()
 
-  // Keyboard navigation for tabs
-  const handleTabKeyDown = (e, currentIndex) => {
+  const tabs = [
+    { key: 'resumen', label: '📊 Resumen' },
+    { key: 'historial', label: '📋 Historial' },
+    { key: 'ciclos', label: '🔄 Ciclos' },
+    { key: 'prestamo', label: '🚨 Autopréstamo' },
+    { key: 'referidos', label: '👥 Referidos' },
+    { key: 'carlos', label: '🛵 Simulación' },
+    { key: 'ingresos', label: '💰 Distribución' },
+  ]
+
+  // ── Issue #2: keyboard navigation ────────────────────────────────────────
+  function handleTabKeyDown(e, currentIndex) {
     let newIndex = currentIndex
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault()
@@ -41,14 +49,11 @@ export function RetirementSnapshot() {
     } else if (e.key === 'End') {
       e.preventDefault()
       newIndex = tabs.length - 1
-    } else {
-      return
-    }
+    } else return
+
     setActiveTab(tabs[newIndex].key)
-    // Focus the new tab after state update
     setTimeout(() => {
-      const newTab = document.getElementById(`tab-${tabs[newIndex].key}`)
-      if (newTab) newTab.focus()
+      document.getElementById(`tab-${tabs[newIndex].key}`)?.focus()
     }, 0)
   }
 
@@ -59,7 +64,6 @@ export function RetirementSnapshot() {
         if (!address) throw new Error('Wallet no conectada')
         setAddress(address)
 
-        // Balances de la wallet (XLM + USDC libre)
         const data = await getBalances(address)
         const xlm = data.find(b => b.asset_type === 'native')
         const usdc = data.find(b => b.asset_code === 'USDC')
@@ -68,28 +72,12 @@ export function RetirementSnapshot() {
           usdc: usdc ? parseFloat(usdc.balance).toFixed(2) : '0.00',
         })
 
-        // Fecha de retiro del contrato
-        try {
-          const fecha = await verFechaRetiro(address)
-          setFechaRetiro(fecha)
-        } catch { setFechaRetiro('Pendiente de primer depósito') }
+        try { setFechaRetiro(await verFechaRetiro(address)) }
+        catch { setFechaRetiro('Pendiente de primer depósito') }
 
-        // ── Datos reales del contrato Soroban ────────────────────────────────
-        try {
-          const saldoReal = await verBalanceContrato(address)
-          setLockedBalance(Number(saldoReal))
-        } catch { /* si no hay depósito aún, queda en 0 */ }
-
-        try {
-          const metaReal = await verMeta(address)
-          if (metaReal > 0) setMeta(Number(metaReal))
-        } catch { /* meta default 10000 */ }
-
-        try {
-          const depositos = await verDepositos(address)
-          setDepositCount(Number(depositos))
-        } catch { /* 0 depósitos */ }
-        // ────────────────────────────────────────────────────────────────────
+        try { setLockedBalance(Number(await verBalanceContrato(address))) } catch { }
+        try { const m = await verMeta(address); if (m > 0) setMeta(Number(m)) } catch { }
+        try { setDepositCount(Number(await verDepositos(address))) } catch { }
 
       } catch (err) {
         setError(err.message)
@@ -103,171 +91,146 @@ export function RetirementSnapshot() {
   const usdcLibre = balances ? parseFloat(balances.usdc) : 0
   const proyeccion20 = (lockedBalance * Math.pow(1 + userRate / 100, 20)).toFixed(2)
   const cycles = calculateCycles(25, 20, userRate, 9)
-  const cardStyle = { backgroundColor: '#0c0c0c', border: '1px solid rgba(255,255,255,0.06)' }
-
-  const tabs = [
-    { key: 'resumen', label: '📊 Resumen' },
-    { key: 'historial', label: '📋 Historial' },
-    { key: 'ciclos', label: '🔄 Ciclos' },
-    { key: 'prestamo', label: '🚨 Autopréstamo' },
-    { key: 'referidos', label: '👥 Referidos' },
-    { key: 'carlos', label: '🛵 Simulación' },
-    { key: 'ingresos', label: '💰 Distribución' },
-  ]
-
-  const skeletonCardStyle = {
-    backgroundColor: '#0c0c0c',
-    border: '1px solid rgba(255,255,255,0.06)',
-  }
 
   return (
-    <div style={{ backgroundColor: '#050505', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
-      <style>{`
-        @keyframes skeleton-pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.15; }
-        }
-        .skeleton-pulse {
-          background: rgba(255,255,255,0.12);
-          border-radius: 6px;
-          animation: skeleton-pulse 1.6s ease-in-out infinite;
-        }
-        .tab-scroll-wrap { position: relative; }
-        .tab-scroll-wrap::after {
-          content: '';
-          position: absolute;
-          top: 0; right: 0;
-          width: 48px; height: 100%;
-          background: linear-gradient(to right, transparent, #050505);
-          pointer-events: none;
-        }
-        .tab-scroll {
-          overflow-x: auto;
-          scrollbar-width: none;
-        }
-        .tab-scroll::-webkit-scrollbar { display: none; }
-      `}</style>
+    <div>
 
-      <div className="mb-4">
-        <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-          <div className="badge rounded-pill px-3 py-2"
-            style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#f59e0b', border: '1px solid rgba(59,130,246,0.2)' }}>
-            📊 Mañana Seguro
-          </div>
-          {address && <span className="text-white-50 small font-monospace">{address.slice(0, 8)}...{address.slice(-8)}</span>}
-        </div>
-        <h2 className="fw-bold mb-2" style={{ letterSpacing: '-2px' }}>Dashboard de ahorro</h2>
-        <RateBadge compact />
+      {/* Header */}
+      <div className="flex items-center gap-3 flex-wrap mb-2">
+        <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-3 py-1.5 text-xs font-semibold">
+          📊 Mañana Seguro
+        </span>
+        {address && (
+          <span className="text-xs text-ink/40 font-mono">
+            {address.slice(0, 8)}...{address.slice(-8)}
+          </span>
+        )}
       </div>
+      <h2 className="font-display font-black text-ink tracking-tight mb-2"
+        style={{ fontSize: 'clamp(1.8rem,4vw,2.4rem)' }}>
+        Dashboard de ahorro
+      </h2>
+      <RateBadge compact />
 
+      {/* ── Issue #5: Skeleton cards ─────────────────────────────────────── */}
       {loading && (
-        <div className="row g-3 mb-4" aria-busy="true" aria-label="Cargando datos del dashboard">
-          {[
-            'USDC en wallet',
-            'USDC bloqueado',
-            'Proyección a 20 años',
-            'Fecha de retiro',
-          ].map((label) => (
-            <div className="col-sm-6 col-xl-3" key={label}>
-              <div className="p-4 rounded-4 h-100" style={skeletonCardStyle}>
-                <div className="small mb-2" style={{ color: 'transparent', userSelect: 'none' }}>{label}</div>
-                <div className="skeleton-pulse mb-2" style={{ height: 24, width: '70%' }} />
-                <div className="skeleton-pulse" style={{ height: 14, width: '90%' }} />
-              </div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-6 mb-4"
+          aria-busy="true" aria-label="Cargando datos del dashboard">
+          {['USDC en wallet', 'USDC bloqueado', 'Proyección a 20 años', 'Fecha de retiro'].map(label => (
+            <div key={label} className="bg-ink/4 border border-ink/6 rounded-2xl p-4 h-28">
+              <div className="text-transparent text-xs select-none mb-3">{label}</div>
+              <div className="skeleton-pulse h-6 w-3/4 mb-2 rounded" />
+              <div className="skeleton-pulse h-3 w-full rounded" />
             </div>
           ))}
         </div>
       )}
+
+      {/* ── Issue #3: Error states diferenciados ─────────────────────────── */}
       {error && (
-  <div className="error-container" style={{ backgroundColor: '#1a1a1a', color: '#f59e0b', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-    {error?.includes('Freighter') || error?.includes('not installed') ? (
-      <>
-        <strong>⚠️ Freighter wallet not detected</strong>
-        <p style={{ marginTop: '8px', marginBottom: '8px' }}>To use this app, you need the Freighter wallet extension.</p>
-        <a href="https://freighter.app/" target="_blank" rel="noopener noreferrer" style={{ color: '#f59e0b' }}>Install Freighter →</a>
-      </>
-    ) : error?.includes('connected') ? (
-      <>
-        <strong>⚠️ Wallet not connected</strong>
-        <p style={{ marginTop: '8px', marginBottom: '8px' }}>Please connect your wallet to continue.</p>
-        <button className="connect-wallet-btn" style={{ backgroundColor: '#f59e0b', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', color: '#000', fontWeight: 'bold' }}>
-          Connect Wallet
-        </button>
-      </>
-    ) : (
-      <>
-        <strong>⚠️ {error}</strong>
-        <p style={{ marginTop: '8px', marginBottom: '8px' }}>Something went wrong. Please try again.</p>
-      </>
-    )}
-  </div>
-)}
+        <div className="bg-ink/5 border border-brand/20 rounded-2xl p-5 mb-6 mt-4">
+          {error.includes('Freighter') || error.includes('not installed') ? (
+            <div>
+              <p className="font-semibold text-ink mb-1">⚠️ Freighter no detectado</p>
+              <p className="text-sm text-ink/50 mb-3">
+                Para usar esta app necesitas la extensión Freighter Wallet.
+              </p>
+              <a href="https://freighter.app/" target="_blank" rel="noopener noreferrer"
+                className="text-sm text-brand font-semibold hover:text-brand-dark transition-colors">
+                Instalar Freighter →
+              </a>
+            </div>
+          ) : error.includes('connected') || error.includes('conectada') ? (
+            <div>
+              <p className="font-semibold text-ink mb-1">⚠️ Wallet no conectada</p>
+              <p className="text-sm text-ink/50 mb-3">
+                Conecta tu wallet para ver tu dashboard.
+              </p>
+              <button
+                className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                onClick={() => window.location.reload()}>
+                Conectar wallet
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="font-semibold text-ink mb-1">⚠️ {error}</p>
+              <p className="text-sm text-ink/50">Algo salió mal. Intenta de nuevo.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {balances && (
         <>
-          <div className="row g-3 mb-4">
+          {/* ── Stat cards ─────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-6 mb-4">
             {[
-              { label: 'USDC en wallet', val: `$${usdcLibre.toFixed(2)}`, sub: 'Balance libre Stellar testnet', color: '#f59e0b' },
-              { label: 'USDC bloqueado', val: formatCurrencyUsd(lockedBalance), sub: `${depositCount} depósito${depositCount !== 1 ? 's' : ''} on-chain`, color: '#22c55e' },
-              { label: 'Proyección a 20 años', val: formatCurrencyUsd(Number(proyeccion20)), sub: `a ${userRate.toFixed(2)}% APY`, color: '#fbbf24' },
-              { label: 'Fecha de retiro', val: fechaRetiro ?? '—', sub: 'Según contrato Soroban', color: 'rgba(255,255,255,0.6)' },
-            ].map((stat) => (
-              <div className="col-sm-6 col-xl-3" key={stat.label}>
-                <div className="p-4 rounded-4 h-100" style={cardStyle}>
-                  <div className="small text-white-50 mb-2">{stat.label}</div>
-                  <div className="fs-5 fw-bold" style={{ color: stat.color }}>{stat.val}</div>
-                  <div className="small text-white-50 mt-1">{stat.sub}</div>
-                </div>
+              { label: 'USDC en wallet', val: `$${usdcLibre.toFixed(2)}`, sub: 'Balance libre Stellar testnet', color: 'text-brand' },
+              { label: 'USDC bloqueado', val: formatCurrencyUsd(lockedBalance), sub: `${depositCount} depósito${depositCount !== 1 ? 's' : ''} on-chain`, color: 'text-green-600' },
+              { label: 'Proyección a 20 años', val: formatCurrencyUsd(Number(proyeccion20)), sub: `a ${userRate.toFixed(2)}% APY`, color: 'text-yellow-500' },
+              { label: 'Fecha de retiro', val: fechaRetiro ?? '—', sub: 'Según contrato Soroban', color: 'text-ink/60' },
+            ].map(stat => (
+              <div key={stat.label} className="bg-white border border-ink/8 rounded-2xl p-4">
+                <p className="text-xs text-ink/40 mb-2">{stat.label}</p>
+                <p className={`text-base font-bold mb-1 ${stat.color}`}>{stat.val}</p>
+                <p className="text-xs text-ink/35">{stat.sub}</p>
               </div>
             ))}
           </div>
 
-          {/* Progreso con datos reales del contrato */}
-          <div className="p-4 rounded-4 mb-4" style={cardStyle}>
-            <div className="d-flex justify-content-between mb-3">
-              <span className="fw-bold">Progreso hacia meta</span>
-              <span className="text-white-50 small">Meta: {formatCurrencyUsd(meta)}</span>
+          {/* ── Progreso ───────────────────────────────────────────────────── */}
+          <div className="bg-white border border-ink/8 rounded-2xl p-5 mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <span className="font-semibold text-ink text-sm">Progreso hacia meta</span>
+              <span className="text-xs text-ink/40">Meta: {formatCurrencyUsd(meta)}</span>
             </div>
-            <div className="progress rounded-pill mb-2" style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.05)' }}>
-              <div className="progress-bar rounded-pill"
-                style={{ width: `${Math.min((lockedBalance / meta) * 100, 100)}%`, background: 'linear-gradient(90deg, #d97706, #f59e0b)' }} />
+            <div className="h-2 bg-ink/5 rounded-full mb-2 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-brand-dark to-brand rounded-full transition-all duration-700"
+                style={{ width: `${Math.min((lockedBalance / meta) * 100, 100)}%` }} />
             </div>
-            <div className="d-flex justify-content-between">
-              <span className="small text-white-50">{formatCurrencyUsd(lockedBalance)} bloqueados en contrato</span>
-              <span className="small" style={{ color: '#f59e0b' }}>{((lockedBalance / meta) * 100).toFixed(1)}%</span>
+            <div className="flex justify-between">
+              <span className="text-xs text-ink/40">{formatCurrencyUsd(lockedBalance)} bloqueados</span>
+              <span className="text-xs text-brand font-semibold">{((lockedBalance / meta) * 100).toFixed(1)}%</span>
             </div>
           </div>
 
-          <div className="tab-scroll-wrap mb-4">
-          <div role="tablist" className="tab-scroll d-flex gap-2 pb-1" style={{ flexWrap: 'nowrap' }} aria-label="Dashboard sections">
-            {tabs.map((t, index) => (
-              <button key={t.key}
-                id={`tab-${t.key}`}
-                role="tab"
-                aria-selected={activeTab === t.key}
-                aria-controls={`panel-${t.key}`}
-                tabIndex={activeTab === t.key ? 0 : -1}
-                className="btn btn-sm rounded-3 fw-bold flex-shrink-0"
-                style={{
-                  backgroundColor: activeTab === t.key ? 'rgba(59,130,246,0.15)' : 'transparent',
-                  border: activeTab === t.key ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                  color: activeTab === t.key ? '#f59e0b' : 'rgba(255,255,255,0.4)',
-                  whiteSpace: 'nowrap',
-                }}
-                onClick={() => setActiveTab(t.key)}
-                onKeyDown={(e) => handleTabKeyDown(e, index)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* ── Issue #1: Tab bar mobile con scroll oculto + fade ──────────── */}
+          <div className="relative mb-4">
+            {/* Fade gradient derecho */}
+            <div className="absolute top-0 right-0 w-12 h-full bg-gradient-to-r from-transparent to-surface pointer-events-none z-10" />
+
+            <div
+              role="tablist"
+              aria-label="Dashboard sections"
+              className="flex gap-2 overflow-x-auto pb-1 tab-scroll">
+              {tabs.map((t, index) => (
+                <button
+                  key={t.key}
+                  id={`tab-${t.key}`}
+                  role="tab"
+                  aria-selected={activeTab === t.key}
+                  aria-controls={`panel-${t.key}`}
+                  tabIndex={activeTab === t.key ? 0 : -1}
+                  className={`shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap ${activeTab === t.key
+                      ? 'bg-brand/10 border-brand/30 text-brand'
+                      : 'bg-transparent border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20'
+                    }`}
+                  onClick={() => setActiveTab(t.key)}
+                  onKeyDown={e => handleTabKeyDown(e, index)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* ── Paneles ────────────────────────────────────────────────────── */}
           {activeTab === 'resumen' && (
-            <div id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen" className="d-flex flex-column gap-4">
+            <div id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen" className="flex flex-col gap-4">
               <RateBadge />
-              <div className="p-4 rounded-4" style={cardStyle}>
-                <h6 className="fw-bold mb-3">Estado del contrato</h6>
-                <div className="row g-3">
+              <div className="bg-white border border-ink/8 rounded-2xl p-5">
+                <h6 className="font-semibold text-ink mb-4">Estado del contrato</h6>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { label: 'Red', val: 'Stellar Testnet' },
                     { label: 'Proveedor yield', val: 'Etherfuse CETES' },
@@ -277,10 +240,10 @@ export function RetirementSnapshot() {
                     { label: 'Mínimo depósito', val: `$${MANANA_SEGURO_RATES.minDeposit} USDC` },
                     { label: 'Autopréstamo máx.', val: `${MANANA_SEGURO_RATES.loanMaxPct * 100}% del saldo` },
                     { label: 'Incentivo máximo', val: '9% cada 5 años' },
-                  ].map((item) => (
-                    <div className="col-sm-6 col-md-4 col-lg-3" key={item.label}>
-                      <div className="small text-white-50">{item.label}</div>
-                      <div className="fw-bold small">{item.val}</div>
+                  ].map(item => (
+                    <div key={item.label}>
+                      <p className="text-xs text-ink/40 mb-0.5">{item.label}</p>
+                      <p className="text-sm font-semibold text-ink">{item.val}</p>
                     </div>
                   ))}
                 </div>
@@ -288,38 +251,47 @@ export function RetirementSnapshot() {
             </div>
           )}
 
-          {activeTab === 'historial' && <div id="panel-historial" role="tabpanel" aria-labelledby="tab-historial"><ContributionHistory walletAddress={address} lockedBalance={lockedBalance} depositCount={depositCount} /></div>}
+          {activeTab === 'historial' && (
+            <div id="panel-historial" role="tabpanel" aria-labelledby="tab-historial">
+              <ContributionHistory walletAddress={address} lockedBalance={lockedBalance} depositCount={depositCount} />
+            </div>
+          )}
 
           {activeTab === 'ciclos' && (
-            <div id="panel-ciclos" role="tabpanel" aria-labelledby="tab-ciclos" className="p-4 rounded-4" style={cardStyle}>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h6 className="fw-bold mb-0">Ciclos cada 5 años · $25 USDC/mes</h6>
-                <span className="badge rounded-pill" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <div id="panel-ciclos" role="tabpanel" aria-labelledby="tab-ciclos"
+              className="bg-white border border-ink/8 rounded-2xl p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h6 className="font-semibold text-ink">Ciclos cada 5 años · $25 USDC/mes</h6>
+                <span className="text-xs bg-yellow-400/10 text-yellow-600 border border-yellow-400/20 rounded-full px-3 py-1 font-semibold">
                   9% incentivo máx.
                 </span>
               </div>
-              <div className="table-responsive">
-                <table className="table table-dark table-borderless mb-0" style={{ fontSize: 13 }}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-white-50">
-                      <th>Ciclo</th><th>Años</th><th>Saldo fin</th><th>Rendimiento</th><th style={{ color: '#fbbf24' }}>Incentivo</th>
+                    <tr className="text-ink/40 text-xs border-b border-ink/6">
+                      <th className="text-left pb-2 font-medium">Ciclo</th>
+                      <th className="text-left pb-2 font-medium">Años</th>
+                      <th className="text-left pb-2 font-medium">Saldo fin</th>
+                      <th className="text-left pb-2 font-medium">Rendimiento</th>
+                      <th className="text-left pb-2 font-medium text-yellow-600">Incentivo</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cycles.map(c => (
-                      <tr key={c.cycle}>
-                        <td className="fw-bold">{c.cycle}</td>
-                        <td className="text-white-50">{c.yearStart}–{c.yearEnd}</td>
-                        <td style={{ color: '#f59e0b' }}>{formatCurrencyUsd(c.endBalance)}</td>
-                        <td style={{ color: '#22c55e' }}>{formatCurrencyUsd(c.totalYield)}</td>
-                        <td style={{ color: '#fbbf24' }}>+{formatCurrencyUsd(c.incentiveAmount)}</td>
+                      <tr key={c.cycle} className="border-b border-ink/4">
+                        <td className="py-2.5 font-semibold text-ink">{c.cycle}</td>
+                        <td className="py-2.5 text-ink/40">{c.yearStart}–{c.yearEnd}</td>
+                        <td className="py-2.5 text-brand font-semibold">{formatCurrencyUsd(c.endBalance)}</td>
+                        <td className="py-2.5 text-green-600 font-semibold">{formatCurrencyUsd(c.totalYield)}</td>
+                        <td className="py-2.5 text-yellow-600 font-semibold">+{formatCurrencyUsd(c.incentiveAmount)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                      <td colSpan={4} className="fw-bold">Total incentivos</td>
-                      <td className="fw-bold" style={{ color: '#fbbf24' }}>
+                    <tr className="border-t-2 border-ink/10">
+                      <td colSpan={4} className="pt-3 font-semibold text-ink">Total incentivos</td>
+                      <td className="pt-3 font-bold text-yellow-600">
                         {formatCurrencyUsd(cycles.reduce((s, c) => s + c.incentiveAmount, 0))}
                       </td>
                     </tr>
@@ -329,37 +301,68 @@ export function RetirementSnapshot() {
             </div>
           )}
 
-          {/* AutoloanCard recibe el saldo REAL del contrato y la dirección */}
-          {activeTab === 'prestamo' && <div id="panel-prestamo" role="tabpanel" aria-labelledby="tab-prestamo"><AutoloanCard lockedBalance={lockedBalance} walletAddress={address} /></div>}
-          {activeTab === 'referidos' && <div id="panel-referidos" role="tabpanel" aria-labelledby="tab-referidos"><ReferralModule userName={address?.slice(0, 8) ?? 'usuario'} walletAddress={address} /></div>}
-          {activeTab === 'carlos' && <div id="panel-carlos" role="tabpanel" aria-labelledby="tab-carlos"><CarlosSimulator /></div>}
+          {activeTab === 'prestamo' && (
+            <div id="panel-prestamo" role="tabpanel" aria-labelledby="tab-prestamo">
+              <AutoloanCard lockedBalance={lockedBalance} walletAddress={address} />
+            </div>
+          )}
+
+          {activeTab === 'referidos' && (
+            <div id="panel-referidos" role="tabpanel" aria-labelledby="tab-referidos">
+              <ReferralModule userName={address?.slice(0, 8) ?? 'usuario'} walletAddress={address} />
+            </div>
+          )}
+
+          {activeTab === 'carlos' && (
+            <div id="panel-carlos" role="tabpanel" aria-labelledby="tab-carlos">
+              <CarlosSimulator />
+            </div>
+          )}
 
           {activeTab === 'ingresos' && (
-            <div id="panel-ingresos" role="tabpanel" aria-labelledby="tab-ingresos" className="p-4 rounded-4" style={cardStyle}>
-              <h6 className="fw-bold mb-3">Distribución del rendimiento</h6>
-              <div className="mb-4">
-                <div className="progress rounded-pill mb-2" style={{ height: 24, backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                  <div className="progress-bar"
-                    style={{ width: `${(userRate / cetesRate) * 100}%`, background: 'linear-gradient(90deg, #d97706, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
+            <div id="panel-ingresos" role="tabpanel" aria-labelledby="tab-ingresos"
+              className="bg-white border border-ink/8 rounded-2xl p-5">
+              <h6 className="font-semibold text-ink mb-4">Distribución del rendimiento</h6>
+
+              <div className="mb-6">
+                <div className="h-7 bg-ink/5 rounded-full overflow-hidden flex mb-2">
+                  <div className="h-full bg-gradient-to-r from-brand-dark to-green-500 flex items-center justify-center text-white text-xs font-bold transition-all"
+                    style={{ width: `${(userRate / cetesRate) * 100}%` }}>
                     {userRate.toFixed(2)}% → tú
                   </div>
-                  <div className="progress-bar"
-                    style={{ width: `${(platformRate / cetesRate) * 100}%`, background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#000' }}>
+                  <div className="h-full bg-brand flex items-center justify-center text-white text-xs font-bold transition-all"
+                    style={{ width: `${(platformRate / cetesRate) * 100}%` }}>
                     {platformRate.toFixed(2)}%
                   </div>
                 </div>
-                <div className="d-flex justify-content-between">
-                  <span className="small" style={{ color: '#22c55e' }}>{userRate.toFixed(2)}% al usuario</span>
-                  <span className="small" style={{ color: '#f59e0b' }}>{platformRate.toFixed(2)}% Mañana Seguro</span>
+                <div className="flex justify-between">
+                  <span className="text-xs text-green-600 font-medium">{userRate.toFixed(2)}% al usuario</span>
+                  <span className="text-xs text-brand font-medium">{platformRate.toFixed(2)}% Mañana Seguro</span>
                 </div>
               </div>
-              <h6 className="fw-bold mb-3">Proyección por escala</h6>
-              <div className="table-responsive">
-                <table className="table table-dark table-borderless mb-0" style={{ fontSize: 13 }}>
-                  <thead><tr className="text-white-50"><th>Usuarios</th><th>Activos</th><th>Ingreso anual</th></tr></thead>
+
+              <h6 className="font-semibold text-ink mb-3">Proyección por escala</h6>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-ink/40 text-xs border-b border-ink/6">
+                      <th className="text-left pb-2 font-medium">Usuarios</th>
+                      <th className="text-left pb-2 font-medium">Activos</th>
+                      <th className="text-left pb-2 font-medium">Ingreso anual</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {[['200', '$100K USDC', '$1,000'], ['1,000', '$500K USDC', '$5,000'], ['10,000', '$5M USDC', '$50,000'], ['50,000', '$25M USDC', '$250,000']].map(([u, a, i]) => (
-                      <tr key={u}><td className="fw-bold">{u}</td><td className="text-white-50">{a}</td><td style={{ color: '#22c55e' }}>{i} USDC</td></tr>
+                    {[
+                      ['200', '$100K USDC', '$1,000'],
+                      ['1,000', '$500K USDC', '$5,000'],
+                      ['10,000', '$5M USDC', '$50,000'],
+                      ['50,000', '$25M USDC', '$250,000'],
+                    ].map(([u, a, i]) => (
+                      <tr key={u} className="border-b border-ink/4">
+                        <td className="py-2.5 font-semibold text-ink">{u}</td>
+                        <td className="py-2.5 text-ink/40">{a}</td>
+                        <td className="py-2.5 text-green-600 font-semibold">{i} USDC</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>

@@ -1,12 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { conectarWallet } from '../../../lib/wallet'
 import { getBalances } from '../../../lib/stellar'
 
-export function ConnectAccountCard() {
-  const [wallet, setWallet] = useState(null)
+export function ConnectAccountCard({ walletAddress: initialAddress }) {
+  const [wallet, setWallet] = useState(initialAddress ?? null)
   const [balance, setBalance] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (initialAddress) cargarBalances(initialAddress)
+  }, [initialAddress])
+
+  async function cargarBalances(address) {
+    try {
+      const balances = await getBalances(address)
+      const xlm = balances.find(b => b.asset_type === 'native')
+      const usdc = balances.find(b => b.asset_code === 'USDC')
+      setBalance({
+        xlm: xlm ? parseFloat(xlm.balance).toFixed(2) : '0',
+        usdc: usdc ? parseFloat(usdc.balance).toFixed(2) : '0',
+      })
+    } catch (err) {
+      setError(err.message)
+    }
+  }
 
   async function handleConectar() {
     try {
@@ -14,15 +32,7 @@ export function ConnectAccountCard() {
       setError(null)
       const address = await conectarWallet()
       setWallet(address)
-
-      const balances = await getBalances(address)
-      const xlm = balances.find(b => b.asset_type === 'native')
-      const usdc = balances.find(b => b.asset_code === 'USDC')
-
-      setBalance({
-        xlm: xlm ? parseFloat(xlm.balance).toFixed(2) : '0',
-        usdc: usdc ? parseFloat(usdc.balance).toFixed(2) : '0',
-      })
+      await cargarBalances(address)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -30,64 +40,63 @@ export function ConnectAccountCard() {
     }
   }
 
-  return (
-    <div style={{ color: '#fff', fontFamily: "'Inter', sans-serif" }}>
+  const panels = [
+    { label: 'Estado', val: wallet ? 'Conectada ✓' : 'Pendiente', color: wallet ? 'text-green-600' : 'text-ink/25' },
+    { label: 'Balance XLM', val: balance ? `${balance.xlm} XLM` : '—', color: 'text-ink' },
+    { label: 'Balance USDC', val: balance ? `$${balance.usdc}` : '—', color: 'text-brand' },
+    { label: 'Dirección', val: wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-6)}` : '—', color: 'text-ink/40', mono: true },
+  ]
 
-      {/* Header */}
-      <div className="mb-4">
-        <div className="badge rounded-pill px-3 py-2 mb-3"
-          style={{ backgroundColor: wallet ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)', color: wallet ? '#22c55e' : '#f59e0b', border: `1px solid ${wallet ? 'rgba(34,197,94,0.2)' : 'rgba(59,130,246,0.2)'}` }}>
+  return (
+    <div>
+      <div className="mb-6">
+        <span className={`inline-block rounded-lg px-3 py-1.5 text-xs font-semibold mb-3 border ${wallet
+            ? 'bg-green-500/10 text-green-700 border-green-500/20'
+            : 'bg-brand/10 text-brand-dark border-brand/20'
+          }`}>
           {wallet ? '✓ Wallet conectada' : '🔐 Conecta tu wallet'}
-        </div>
-        <h3 className="fw-bold mb-2" style={{ letterSpacing: '-1px' }}>Freighter · Stellar</h3>
-        <p className="text-white-50 small mb-0">
-          Conecta Freighter para acceder a tu ahorro voluntario en RetiroChain.
+        </span>
+        <h3 className="font-display font-black text-ink text-xl mb-1 tracking-tight">
+          Freighter · Stellar
+        </h3>
+        <p className="text-sm text-ink/45 leading-relaxed">
+          Conecta Freighter para acceder a tu ahorro voluntario en Mañana Seguro.
         </p>
       </div>
 
-      {/* Botón */}
       <button
-        className="btn btn-primary w-100 py-3 rounded-4 fw-bold mb-4"
-        style={{ background: wallet ? 'rgba(34,197,94,0.15)' : 'linear-gradient(45deg, #d97706, #f59e0b)', border: wallet ? '1px solid rgba(34,197,94,0.3)' : 'none', color: wallet ? '#22c55e' : '#fff' }}
+        className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all cursor-pointer mb-5 ${wallet
+            ? 'bg-green-500/10 text-green-700 border border-green-500/20 cursor-default'
+            : 'bg-brand hover:bg-brand-dark text-white hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30'
+          } disabled:opacity-50`}
         onClick={handleConectar}
-        disabled={!!wallet || loading}
-      >
+        disabled={!!wallet || loading}>
         {loading ? (
-          <span className="d-flex align-items-center justify-content-center gap-2">
-            <span className="spinner-border spinner-border-sm" /> Conectando...
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Conectando...
           </span>
         ) : wallet ? '✓ Wallet Conectada' : 'Conectar Freighter'}
       </button>
 
-      {/* Error */}
       {error && (
-        <div className="p-3 rounded-4 mb-4 small"
-          style={{ backgroundColor: 'rgba(220,53,69,0.1)', border: '1px dashed rgba(220,53,69,0.4)', color: '#ff6b6b' }}>
+        <div className="bg-red-500/8 border border-dashed border-red-400/40 text-red-500 text-sm px-4 py-3 rounded-xl mb-5">
           ⚠️ {error}
         </div>
       )}
 
-      {/* Panels */}
-      <div className="row g-2">
-        {[
-          { label: 'Estado', val: wallet ? 'Conectada ✓' : 'Pendiente', color: wallet ? '#22c55e' : 'rgba(255,255,255,0.3)' },
-          { label: 'Balance XLM', val: balance ? `${balance.xlm} XLM` : '—', color: '#fff' },
-          { label: 'Balance USDC', val: balance ? `$${balance.usdc}` : '—', color: '#f59e0b' },
-          { label: 'Dirección', val: wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-6)}` : '—', color: 'rgba(255,255,255,0.5)', mono: true },
-        ].map((item) => (
-          <div className="col-6" key={item.label}>
-            <div className="p-3 rounded-4 h-100"
-              style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="text-white-50 small mb-1">{item.label}</div>
-              <div className={`fw-bold small ${item.mono ? 'font-monospace' : ''}`}
-                style={{ color: item.color }}>
-                {item.val}
-              </div>
-            </div>
+      <div className="grid grid-cols-2 gap-2">
+        {panels.map(item => (
+          <div key={item.label} className="bg-ink/3 border border-ink/6 rounded-xl p-3">
+            <p className="text-xs text-ink/40 mb-1">{item.label}</p>
+            <p className={`text-sm font-bold ${item.color} ${item.mono ? 'font-mono' : ''}`}>
+              {item.val}
+            </p>
           </div>
         ))}
       </div>
-
     </div>
   )
 }

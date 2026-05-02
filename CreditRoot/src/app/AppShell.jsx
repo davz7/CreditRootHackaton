@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AppHeader } from '../components/layout/AppHeader'
 import { AppFooter } from '../components/layout/AppFooter'
 import { LandingScreen } from '../screens/LandingScreen'
@@ -8,33 +9,39 @@ import { PlannerScreen } from '../screens/PlannerScreen'
 import { DashboardScreen } from '../screens/DashboardScreen'
 import { WithdrawalScreen } from '../screens/WithdrawalScreen'
 
-export function AppShell() {
-  const [pantalla, setPantalla] = useState('landing')
-  const [usuario, setUsuario] = useState(null)
-
-  function handleAuth(datos) {
-    setUsuario(datos)
-    setPantalla('app')
-  }
-
-  if (pantalla === 'landing') {
-    return <LandingScreen onLogin={() => setPantalla('login')} onRegister={() => setPantalla('register')} />
-  }
-
-  if (pantalla === 'login' || pantalla === 'register') {
-    return <AuthScreen modo={pantalla} onAuth={handleAuth} onVolver={() => setPantalla('landing')} />
-  }
-
+function AppLayout({ usuario }) {
   return (
-    <div className="app-shell">
+    <div className="bg-surface min-h-screen">
       <AppHeader usuario={usuario} />
       <main>
-        <HomeScreen />
-        <PlannerScreen />
-        <DashboardScreen />
-        <WithdrawalScreen />
+        <Routes>
+          <Route path="/home" element={<HomeScreen usuario={usuario} />} />
+          <Route path="/dashboard" element={<DashboardScreen />} />
+          <Route path="/planner" element={<PlannerScreen />} />
+          <Route path="/withdrawal" element={<WithdrawalScreen />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
       </main>
       <AppFooter />
     </div>
+  )
+}
+
+export function AppShell() {
+  const [usuario, setUsuario] = useState(null)
+  const navigate = useNavigate()
+
+  function handleAuth(datos) {
+    setUsuario(datos)
+    navigate('/home')
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingScreen onLogin={() => navigate('/login')} onRegister={() => navigate('/register')} />} />
+      <Route path="/login" element={<AuthScreen modo="login" onAuth={handleAuth} onVolver={() => navigate('/')} />} />
+      <Route path="/register" element={<AuthScreen modo="register" onAuth={handleAuth} onVolver={() => navigate('/')} />} />
+      <Route path="/*" element={usuario ? <AppLayout usuario={usuario} /> : <Navigate to="/" replace />} />
+    </Routes>
   )
 }

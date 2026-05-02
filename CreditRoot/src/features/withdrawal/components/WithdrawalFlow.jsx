@@ -6,16 +6,6 @@ import { MANANA_SEGURO_RATES } from '../../../data/retirementContent'
 import { formatCurrencyUsd, formatCurrencyMxn } from '../../../utils/formatters'
 import freighterApi from '@stellar/freighter-api'
 
-/**
- * WithdrawalFlow — Flujo completo de retiro
- *
- * Usa datos REALES del contrato Soroban:
- * - verBalanceContrato → saldo bloqueado real
- * - verFechaRetiro     → fecha real de bloqueo
- * - retirarFondos      → transacción Soroban real
- *
- * Estados: verificando → no_alcanzada | alcanzada → procesando → exitoso | error
- */
 export function WithdrawalFlow({ meta = 10000 }) {
   const { userRate, cetesRate } = useEtherfuseRate()
   const [fase, setFase] = useState('verificando')
@@ -36,18 +26,11 @@ export function WithdrawalFlow({ meta = 10000 }) {
       if (!addr) throw new Error('Wallet no conectada — abre Freighter y vuelve a intentar')
       setAddress(addr)
 
-      // ── Saldo real del contrato Soroban ──────────────────────────────────────
-      // verBalanceContrato ya devuelve el valor en USDC (ajustado de stroops)
       const saldo = await verBalanceContrato(addr)
       setSaldoContrato(Number(saldo))
 
-      // ── Fecha de retiro real ─────────────────────────────────────────────────
-      try {
-        const fecha = await verFechaRetiro(addr)
-        setFechaRetiro(fecha)
-      } catch {
-        setFechaRetiro('Pendiente de primer depósito')
-      }
+      try { setFechaRetiro(await verFechaRetiro(addr)) }
+      catch { setFechaRetiro('Pendiente de primer depósito') }
 
       setFase(Number(saldo) >= meta ? 'alcanzada' : 'no_alcanzada')
     } catch (err) {
@@ -64,17 +47,11 @@ export function WithdrawalFlow({ meta = 10000 }) {
       const hash = await enviarTransaccion(signedXdr)
       setTxHash(hash)
 
-      // Resumen estimado: el contrato ya transfirió saldo - 1% comisión
       const comision = saldoContrato * (MANANA_SEGURO_RATES.platformRate / 100)
       const totalRecibido = saldoContrato - comision
       const rendimientoEst = saldoContrato * 0.30
       const aportadoEst = saldoContrato - rendimientoEst
-      setResumenFinal({
-        totalAportado: aportadoEst,
-        rendimiento: rendimientoEst,
-        comision,
-        total: totalRecibido,
-      })
+      setResumenFinal({ totalAportado: aportadoEst, rendimiento: rendimientoEst, comision, total: totalRecibido })
       setFase('exitoso')
     } catch (err) {
       setErrorMsg(err.message ?? 'Error al procesar el retiro en el contrato')
@@ -82,80 +59,78 @@ export function WithdrawalFlow({ meta = 10000 }) {
     }
   }
 
-  const cardStyle = { backgroundColor: '#0c0c0c', border: '1px solid rgba(255,255,255,0.06)' }
   const falta = Math.max(0, meta - saldoContrato)
   const progresoPct = Math.min((saldoContrato / meta) * 100, 100)
 
   return (
-    <div style={{ color: '#fff', fontFamily: "'Inter', sans-serif" }}>
+    <div>
 
       {/* ── Verificando ── */}
       {fase === 'verificando' && (
-        <div className="p-5 rounded-4 text-center" style={cardStyle}>
-          <div className="spinner-border text-primary mb-3" role="status" />
-          <div className="fw-bold mb-1">Verificando tu meta de retiro</div>
-          <div className="small text-white-50">Consultando saldo real en el contrato Soroban...</div>
+        <div className="bg-white border border-ink/8 rounded-2xl p-10 text-center">
+          <svg className="animate-spin mx-auto mb-4 text-brand" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p className="font-semibold text-ink mb-1">Verificando tu meta de retiro</p>
+          <p className="text-sm text-ink/45">Consultando saldo real en el contrato Soroban...</p>
         </div>
       )}
 
       {/* ── Meta no alcanzada ── */}
       {fase === 'no_alcanzada' && (
-        <div className="d-flex flex-column gap-4">
-          <div className="p-4 rounded-4" style={cardStyle}>
-            <div className="d-flex align-items-center gap-2 mb-4">
-              <span style={{ fontSize: 28 }}>⏳</span>
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border border-ink/8 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-3xl">⏳</span>
               <div>
-                <h5 className="fw-bold mb-0">Aún no alcanzas tu meta</h5>
-                <p className="text-white-50 small mb-0">Sigue aportando — vas muy bien.</p>
+                <h5 className="font-display font-black text-ink text-lg mb-0">Aún no alcanzas tu meta</h5>
+                <p className="text-sm text-ink/45 mb-0">Sigue aportando — vas muy bien.</p>
               </div>
             </div>
 
-            <div className="mb-4">
-              <div className="d-flex justify-content-between mb-2">
-                <span className="small fw-bold">Progreso hacia la meta</span>
-                <span className="small" style={{ color: '#f59e0b' }}>{progresoPct.toFixed(1)}%</span>
+            {/* Progreso */}
+            <div className="mb-5">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm font-semibold text-ink">Progreso hacia la meta</span>
+                <span className="text-sm font-bold text-brand">{progresoPct.toFixed(1)}%</span>
               </div>
-              <div className="progress rounded-pill mb-2" style={{ height: 12, backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                <div className="progress-bar rounded-pill"
-                  style={{ width: `${progresoPct}%`, background: 'linear-gradient(90deg, #d97706, #f59e0b)' }} />
+              <div className="h-3 bg-ink/5 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-gradient-to-r from-brand-dark to-brand rounded-full transition-all duration-700"
+                  style={{ width: `${progresoPct}%` }} />
               </div>
-              <div className="d-flex justify-content-between">
-                <span className="small text-white-50">{formatCurrencyUsd(saldoContrato)} bloqueados on-chain</span>
-                <span className="small text-white-50">Meta: {formatCurrencyUsd(meta)}</span>
+              <div className="flex justify-between">
+                <span className="text-xs text-ink/40">{formatCurrencyUsd(saldoContrato)} bloqueados on-chain</span>
+                <span className="text-xs text-ink/40">Meta: {formatCurrencyUsd(meta)}</span>
               </div>
             </div>
 
-            <div className="row g-3">
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Saldo en contrato', val: formatCurrencyUsd(saldoContrato), color: '#f59e0b' },
-                { label: 'Falta para la meta', val: formatCurrencyUsd(falta), color: '#f87171' },
-                { label: 'Fecha de retiro', val: fechaRetiro ?? '—', color: '#fbbf24' },
-                { label: 'Rendimiento activo', val: `${userRate}% APY`, color: '#22c55e' },
+                { label: 'Saldo en contrato', val: formatCurrencyUsd(saldoContrato), color: 'text-brand' },
+                { label: 'Falta para la meta', val: formatCurrencyUsd(falta), color: 'text-red-400' },
+                { label: 'Fecha de retiro', val: fechaRetiro ?? '—', color: 'text-yellow-500' },
+                { label: 'Rendimiento activo', val: `${userRate}% APY`, color: 'text-green-600' },
               ].map(item => (
-                <div className="col-sm-6" key={item.label}>
-                  <div className="p-3 rounded-4"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div className="small text-white-50 mb-1">{item.label}</div>
-                    <div className="fw-bold" style={{ color: item.color }}>{item.val}</div>
-                  </div>
+                <div key={item.label} className="bg-ink/3 border border-ink/6 rounded-xl p-3">
+                  <p className="text-xs text-ink/40 mb-1">{item.label}</p>
+                  <p className={`text-sm font-bold ${item.color}`}>{item.val}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {saldoContrato > 0 && (
-            <div className="p-4 rounded-4"
-              style={{ backgroundColor: 'rgba(251,191,36,0.05)', border: '1px dashed rgba(251,191,36,0.3)' }}>
-              <div className="d-flex align-items-start gap-3">
-                <span style={{ fontSize: 24 }}>🚨</span>
+            <div className="bg-yellow-400/5 border border-dashed border-yellow-400/30 rounded-2xl p-5">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🚨</span>
                 <div>
-                  <div className="fw-bold mb-1">¿Tienes una emergencia?</div>
-                  <div className="small text-white-50 mb-3">
+                  <p className="font-semibold text-ink mb-1">¿Tienes una emergencia?</p>
+                  <p className="text-sm text-ink/50 mb-3">
                     Puedes solicitar hasta {formatCurrencyUsd(saldoContrato * MANANA_SEGURO_RATES.loanMaxPct)} USDC
                     ({MANANA_SEGURO_RATES.loanMaxPct * 100}% de tu saldo) sin perder el bloqueo.
-                  </div>
-                  <span className="badge rounded-pill px-3 py-2"
-                    style={{ backgroundColor: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12, cursor: 'default' }}>
+                  </p>
+                  <span className="inline-block bg-yellow-400/15 text-yellow-600 border border-yellow-400/30 rounded-full px-3 py-1.5 text-xs font-semibold">
                     Ve a la pestaña Autopréstamo →
                   </span>
                 </div>
@@ -167,50 +142,42 @@ export function WithdrawalFlow({ meta = 10000 }) {
 
       {/* ── Meta alcanzada ── */}
       {fase === 'alcanzada' && (
-        <div className="d-flex flex-column gap-4">
-          <div className="p-5 rounded-4 text-center"
-            style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(59,130,246,0.08))', border: '1px solid rgba(34,197,94,0.3)' }}>
-            <div style={{ fontSize: 56 }} className="mb-3">🎉</div>
-            <h4 className="fw-bold mb-2" style={{ letterSpacing: '-1px' }}>
-              ¡Alcanzaste tu meta de retiro!
-            </h4>
-            <div className="fw-bold mb-1" style={{ fontSize: 36, color: '#22c55e', letterSpacing: '-2px' }}>
+        <div className="flex flex-col gap-4">
+          <div className="bg-green-500/8 border border-green-500/25 rounded-2xl p-8 text-center">
+            <div className="text-5xl mb-3">🎉</div>
+            <h4 className="font-display font-black text-ink text-2xl mb-2">¡Alcanzaste tu meta de retiro!</h4>
+            <p className="font-black text-green-600 mb-1" style={{ fontSize: 'clamp(1.8rem,4vw,2.6rem)', letterSpacing: '-2px' }}>
               {formatCurrencyUsd(saldoContrato)} USDC
-            </div>
-            <div className="text-white-50 small">
-              ≈ {formatCurrencyMxn(saldoContrato * 17)} pesos · tipo de cambio $17
-            </div>
+            </p>
+            <p className="text-sm text-ink/45">≈ {formatCurrencyMxn(saldoContrato * 17)} pesos · tipo de cambio $17</p>
           </div>
 
-          <div className="p-4 rounded-4" style={cardStyle}>
-            <h6 className="fw-bold mb-3">Resumen de tu ahorro</h6>
-            <div className="d-flex flex-column gap-2 mb-4">
+          <div className="bg-white border border-ink/8 rounded-2xl p-6">
+            <h6 className="font-semibold text-ink mb-4">Resumen de tu ahorro</h6>
+            <div className="flex flex-col gap-0 mb-5">
               {[
-                { label: 'Saldo bloqueado total', val: formatCurrencyUsd(saldoContrato), color: '#fff' },
-                { label: 'Tasa Etherfuse aplicada', val: `${userRate}% APY`, color: '#22c55e' },
-                { label: 'Tasa bruta CETES', val: `${cetesRate}%`, color: 'rgba(255,255,255,0.5)' },
-                { label: 'Comisión plataforma (1%)', val: formatCurrencyUsd(saldoContrato * 0.01), color: '#f87171' },
-                { label: 'Fecha de retiro', val: fechaRetiro ?? '—', color: '#f59e0b' },
+                { label: 'Saldo bloqueado total', val: formatCurrencyUsd(saldoContrato), color: 'text-ink' },
+                { label: 'Tasa Etherfuse aplicada', val: `${userRate}% APY`, color: 'text-green-600' },
+                { label: 'Tasa bruta CETES', val: `${cetesRate}%`, color: 'text-ink/50' },
+                { label: 'Comisión plataforma (1%)', val: formatCurrencyUsd(saldoContrato * 0.01), color: 'text-red-400' },
+                { label: 'Fecha de retiro', val: fechaRetiro ?? '—', color: 'text-brand' },
               ].map(item => (
-                <div key={item.label} className="d-flex justify-content-between py-2"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span className="small text-white-50">{item.label}</span>
-                  <span className="small fw-bold" style={{ color: item.color }}>{item.val}</span>
+                <div key={item.label} className="flex justify-between py-2.5 border-b border-ink/5">
+                  <span className="text-xs text-ink/45">{item.label}</span>
+                  <span className={`text-xs font-semibold ${item.color}`}>{item.val}</span>
                 </div>
               ))}
             </div>
 
-            <div className="p-3 rounded-3 mb-4"
-              style={{ backgroundColor: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <div className="small" style={{ color: '#93c5fd' }}>
+            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 mb-5">
+              <p className="text-xs text-blue-600/80 leading-relaxed">
                 ℹ Al confirmar, el contrato Soroban ejecuta la transferencia directamente a tu
                 wallet Freighter. Sin intermediarios. La operación quedará registrada on-chain.
-              </div>
+              </p>
             </div>
 
             <button
-              className="btn btn-lg w-100 py-3 rounded-4 fw-bold"
-              style={{ background: 'linear-gradient(45deg, #16a34a, #22c55e)', border: 'none', color: '#000' }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-green-600/30 cursor-pointer"
               onClick={handleRetirar}>
               🏆 Retirar {formatCurrencyUsd(saldoContrato)} USDC a mi wallet
             </button>
@@ -220,19 +187,22 @@ export function WithdrawalFlow({ meta = 10000 }) {
 
       {/* ── Procesando ── */}
       {fase === 'procesando' && (
-        <div className="p-5 rounded-4 text-center" style={cardStyle}>
-          <div className="spinner-border mb-3" style={{ color: '#22c55e', width: 48, height: 48 }} role="status" />
-          <div className="fw-bold fs-5 mb-1">Procesando tu retiro</div>
-          <div className="text-white-50 small mb-3">Firma la transacción en Freighter...</div>
-          <div className="d-flex flex-column gap-2">
+        <div className="bg-white border border-ink/8 rounded-2xl p-10 text-center">
+          <svg className="animate-spin mx-auto mb-4 text-green-600" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p className="font-semibold text-ink text-lg mb-1">Procesando tu retiro</p>
+          <p className="text-sm text-ink/45 mb-5">Firma la transacción en Freighter...</p>
+          <div className="flex flex-col gap-2 items-center">
             {[
               'Verificando elegibilidad en el contrato',
               'Calculando comisión de plataforma (1%)',
               'Preparando transferencia a tu wallet',
             ].map((step, i) => (
-              <div key={step} className="d-flex align-items-center gap-2 justify-content-center small text-white-50">
-                <span className="spinner-border spinner-border-sm"
-                  style={{ width: 10, height: 10, animationDelay: `${i * 0.2}s` }} />
+              <div key={step} className="flex items-center gap-2 text-xs text-ink/40">
+                <svg className="animate-spin shrink-0" style={{ animationDelay: `${i * 0.2}s` }} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
                 {step}
               </div>
             ))}
@@ -240,56 +210,47 @@ export function WithdrawalFlow({ meta = 10000 }) {
         </div>
       )}
 
-      {/* ── Retiro exitoso ── */}
+      {/* ── Exitoso ── */}
       {fase === 'exitoso' && resumenFinal && (
-        <div className="d-flex flex-column gap-4">
-          <div className="p-5 rounded-4 text-center"
-            style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(59,130,246,0.1))', border: '1px solid rgba(34,197,94,0.4)' }}>
-            <div style={{ fontSize: 64 }} className="mb-3">🏆</div>
-            <h4 className="fw-bold mb-2">¡Retiro completado!</h4>
-            <div className="fw-bold mb-1" style={{ fontSize: 40, color: '#22c55e', letterSpacing: '-2px' }}>
+        <div className="flex flex-col gap-4">
+          <div className="bg-green-500/8 border border-green-500/25 rounded-2xl p-8 text-center">
+            <div className="text-5xl mb-3">🏆</div>
+            <h4 className="font-display font-black text-ink text-2xl mb-2">¡Retiro completado!</h4>
+            <p className="font-black text-green-600 mb-1" style={{ fontSize: 'clamp(1.8rem,4vw,2.6rem)', letterSpacing: '-2px' }}>
               {formatCurrencyUsd(resumenFinal.total)}
-            </div>
-            <div className="text-white-50">transferidos a tu wallet Freighter</div>
+            </p>
+            <p className="text-sm text-ink/45">transferidos a tu wallet Freighter</p>
           </div>
 
-          <div className="p-4 rounded-4" style={cardStyle}>
-            <h6 className="fw-bold mb-3">Resumen de tu retiro</h6>
-            <div className="row g-3 mb-4">
+          <div className="bg-white border border-ink/8 rounded-2xl p-6">
+            <h6 className="font-semibold text-ink mb-4">Resumen de tu retiro</h6>
+            <div className="grid grid-cols-2 gap-3 mb-5">
               {[
-                { label: 'Aportado estimado', val: formatCurrencyUsd(resumenFinal.totalAportado), color: '#f59e0b' },
-                { label: 'Rendimiento Etherfuse', val: formatCurrencyUsd(resumenFinal.rendimiento), color: '#22c55e' },
-                { label: 'Comisión plataforma (1%)', val: `−${formatCurrencyUsd(resumenFinal.comision)}`, color: '#f87171' },
-                { label: 'Total recibido', val: formatCurrencyUsd(resumenFinal.total), color: '#fff', bold: true },
+                { label: 'Aportado estimado', val: formatCurrencyUsd(resumenFinal.totalAportado), color: 'text-brand' },
+                { label: 'Rendimiento Etherfuse', val: formatCurrencyUsd(resumenFinal.rendimiento), color: 'text-green-600' },
+                { label: 'Comisión plataforma (1%)', val: `−${formatCurrencyUsd(resumenFinal.comision)}`, color: 'text-red-400' },
+                { label: 'Total recibido', val: formatCurrencyUsd(resumenFinal.total), color: 'text-ink', bold: true },
               ].map(item => (
-                <div className="col-sm-6" key={item.label}>
-                  <div className="p-3 rounded-4 h-100"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div className="small text-white-50 mb-1">{item.label}</div>
-                    <div className={item.bold ? 'fw-bold fs-5' : 'fw-bold'} style={{ color: item.color }}>
-                      {item.val}
-                    </div>
-                  </div>
+                <div key={item.label} className="bg-ink/3 border border-ink/6 rounded-xl p-3">
+                  <p className="text-xs text-ink/40 mb-1">{item.label}</p>
+                  <p className={`font-bold ${item.bold ? 'text-base' : 'text-sm'} ${item.color}`}>{item.val}</p>
                 </div>
               ))}
             </div>
 
-            <div className="p-3 rounded-4 text-center mb-4"
-              style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08))', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <div className="small text-white-50 mb-1">En pesos mexicanos</div>
-              <div className="fw-bold" style={{ fontSize: 28, color: '#22c55e', letterSpacing: '-1px' }}>
+            <div className="bg-green-500/5 border border-green-500/15 rounded-xl p-4 text-center mb-4">
+              <p className="text-xs text-ink/40 mb-1">En pesos mexicanos</p>
+              <p className="font-black text-green-600" style={{ fontSize: 'clamp(1.4rem,3vw,1.8rem)', letterSpacing: '-1px' }}>
                 {formatCurrencyMxn(resumenFinal.total * 17)}
-              </div>
+              </p>
             </div>
 
-            {/* TX hash real en Stellar Expert */}
             {txHash && (
-              <div className="p-3 rounded-4"
-                style={{ backgroundColor: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                <div className="small fw-bold mb-1" style={{ color: '#22c55e' }}>✅ Transacción confirmada en Stellar</div>
+              <div className="bg-green-500/6 border border-green-500/20 rounded-xl p-4">
+                <p className="text-sm font-semibold text-green-700 mb-1">✅ Transacción confirmada en Stellar</p>
                 <a href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
                   target="_blank" rel="noreferrer"
-                  className="small font-monospace" style={{ color: '#f59e0b' }}>
+                  className="text-xs font-mono text-brand hover:text-brand-dark transition-colors">
                   Ver en Stellar Expert → {txHash.slice(0, 20)}...
                 </a>
               </div>
@@ -300,15 +261,14 @@ export function WithdrawalFlow({ meta = 10000 }) {
 
       {/* ── Error ── */}
       {fase === 'error' && (
-        <div className="p-4 rounded-4" style={cardStyle}>
-          <div className="text-center mb-4">
-            <div style={{ fontSize: 40 }}>⚠️</div>
-            <div className="fw-bold mt-2 mb-1">Algo salió mal</div>
-            <div className="small text-white-50">{errorMsg}</div>
+        <div className="bg-white border border-ink/8 rounded-2xl p-8">
+          <div className="text-center mb-5">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="font-semibold text-ink mb-1">Algo salió mal</p>
+            <p className="text-sm text-ink/45">{errorMsg}</p>
           </div>
           <button
-            className="btn w-100 rounded-3 fw-bold"
-            style={{ border: '1px solid rgba(255,255,255,0.15)', color: '#fff', backgroundColor: 'transparent' }}
+            className="w-full border border-ink/15 text-ink font-semibold py-3 rounded-xl hover:bg-ink/5 transition-all cursor-pointer"
             onClick={verificarEstado}>
             Reintentar
           </button>

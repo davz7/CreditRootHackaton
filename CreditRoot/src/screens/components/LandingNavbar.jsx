@@ -1,32 +1,44 @@
+import { useEffect, useState } from 'react'
+import logoCompleto from '../../assets/LOGO_MS.png'
 function LandingNavbar({ onLogin, onRegister, onVolver, soloVolver }) {
-    return (
-        <nav className="navbar sticky-top px-4 py-3"
-            style={{ backdropFilter: 'blur(15px)', backgroundColor: 'rgba(5,5,5,0.85)', borderBottom: '1px solid rgba(255,255,255,0.05)', zIndex: 1000 }}>
-            <div className="container d-flex justify-content-between align-items-center">
+    const [scrolled, setScrolled] = useState(false)
 
-                <span className="fw-black fs-4" style={{ letterSpacing: '-1.5px', color: '#fff' }}>
-                    MAÑANA<span style={{ color: '#f59e0b' }}>SEGURO</span>
-                </span>
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 20)
+        window.addEventListener('scroll', onScroll)
+        return () => window.removeEventListener('scroll', onScroll)
+    }, [])
+
+    return (
+        <nav className={`sticky top-0 z-50 px-4 py-3 transition-shadow duration-300 bg-surface/90 backdrop-blur-md border-b border-ink/8 ${scrolled ? 'shadow-md' : ''}`}>
+            <div className="container mx-auto flex justify-between items-center">
+
+                <div className="flex items-center gap-2">
+                    <img src={logoCompleto} alt="Logo Mañana Seguro" className="h-8 w-auto rounded-lg" />
+                    <span className="font-display font-bold text-xl text-ink tracking-tight">
+                        Mañana <span className="text-brand">Seguro</span>
+                    </span>
+                </div>
 
                 {soloVolver ? (
-                    <button className="btn text-white-50 fw-medium border-0" onClick={onVolver}>
+                    <button className="text-gray hover:text-ink text-sm font-medium transition-colors" onClick={onVolver}>
                         ← Volver al inicio
                     </button>
                 ) : (
-                    <div className="d-flex gap-3 align-items-center">
+                    <div className="flex items-center gap-2">
                         <button
-                            className="btn text-white-50 fw-medium border-0 d-none d-md-block"
+                            className="hidden md:block text-gray hover:text-ink text-sm font-medium px-4 py-2 rounded-lg hover:bg-ink/5 transition-all"
                             onClick={onLogin}>
                             Iniciar sesión
                         </button>
                         <button
-                            className="btn btn-primary px-4 rounded-pill fw-bold"
-                            style={{ background: 'linear-gradient(45deg, #d97706, #f59e0b)', border: 'none' }}
+                            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-brand"
                             onClick={onRegister}>
                             Comenzar gratis
                         </button>
                     </div>
                 )}
+
             </div>
         </nav>
     )

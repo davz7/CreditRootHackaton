@@ -1,22 +1,26 @@
-import { SectionHeading } from '../components/common/SectionHeading'
 import { RetirementSnapshot } from '../features/dashboard/components/RetirementSnapshot'
 
 export function DashboardScreen() {
   return (
-    <section id="dashboard" className="py-5"
-      style={{ backgroundColor: '#050505', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
-      <div className="container py-4">
+    <section className="bg-surface py-16 lg:py-24">
+      <div className="container mx-auto px-4">
 
-        <div className="badge rounded-pill px-3 py-2 mb-3"
-          style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#f59e0b', border: '1px solid rgba(59,130,246,0.2)' }}>
-          Dashboard · Mañana Seguro
+        <div className="mb-8 anim-fade-up-1">
+          <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide mb-4">
+            Dashboard · Mañana Seguro
+          </span>
+          <h2 className="font-display font-black text-ink tracking-tight mb-2"
+            style={{ fontSize: 'clamp(2rem,4vw,2.8rem)', lineHeight: 1.05 }}>
+            Tu ahorro en tiempo real
+          </h2>
+          <p className="text-ink/50 text-lg max-w-xl">
+            Saldo bloqueado, rendimiento Etherfuse, incentivos por ciclo y autopréstamo de emergencia.
+          </p>
         </div>
-        <h2 className="fw-bold mb-2" style={{ letterSpacing: '-2px' }}>Tu ahorro en tiempo real</h2>
-        <p className="text-white-50 mb-5">
-          Saldo bloqueado, rendimiento Etherfuse, incentivos por ciclo y autopréstamo de emergencia.
-        </p>
 
-        <RetirementSnapshot />
+        <div className="anim-fade-up-2">
+          <RetirementSnapshot />
+        </div>
 
       </div>
     </section>

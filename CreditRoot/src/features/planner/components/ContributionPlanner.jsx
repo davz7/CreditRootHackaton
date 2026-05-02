@@ -6,17 +6,15 @@ import { formatCurrencyUsd, formatCurrencyMxn, formatPercentage } from '../../..
 import { calculateCycles } from '../../../utils/projections'
 import { lockFunds, enviarTransaccion } from '../../../lib/stellar'
 import { firmarTransaccion } from '../../../lib/wallet'
-import { buildHistoryEntry, addHistoryEntry } from "../../dashboard/components/ContributionHistory"
+import { buildHistoryEntry, addHistoryEntry } from '../../dashboard/components/ContributionHistory'
 import freighterApi from '@stellar/freighter-api'
 
 export function ContributionPlanner() {
   const { userRate, cetesRate, platformRate, isLive } = useEtherfuseRate()
-
   const { scenario, projection, updateScenario } = useRetirementProjection({
     ...plannerDefaults,
     annualYieldRate: userRate,
   })
-
   const [estado, setEstado] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
@@ -41,13 +39,9 @@ export function ContributionPlanner() {
       const signedXdr = await firmarTransaccion(tx.toXDR())
       const hash = await enviarTransaccion(signedXdr)
       setTxHash(hash)
-
-      // ── Registrar en historial local con el tx hash real ──────────────────
       const entry = buildHistoryEntry(Number(scenario.monthlyDepositUsd), address)
       entry.txHash = hash
       addHistoryEntry(address, entry)
-      // ─────────────────────────────────────────────────────────────────────
-
       setEstado('success')
     } catch (err) {
       setErrorMsg(err.message)
@@ -55,239 +49,243 @@ export function ContributionPlanner() {
     }
   }
 
-  const txUrl = txHash ? 'https://stellar.expert/explorer/testnet/tx/' + txHash : null
-  const cardStyle = { backgroundColor: '#0c0c0c', border: '1px solid rgba(255,255,255,0.06)' }
+  const txUrl = txHash ? `https://stellar.expert/explorer/testnet/tx/${txHash}` : null
+
+  const projCards = [
+    { label: 'Balance al retiro', val: formatCurrencyUsd(projection.projectedBalance), sub: 'incl. incentivos', color: 'text-brand', bg: 'bg-brand/8 border-brand/15' },
+    { label: 'Ganancia por rendimiento', val: formatCurrencyUsd(projection.growthAmount), sub: 'sobre lo aportado', color: 'text-green-600', bg: 'bg-green-500/8 border-green-500/15' },
+    { label: 'Incentivos acumulados', val: formatCurrencyUsd(projection.totalIncentives), sub: `${projection.incentivePct}% cada 5 años`, color: 'text-yellow-500', bg: 'bg-yellow-400/8 border-yellow-400/15' },
+    { label: 'Ingreso mensual retiro', val: formatCurrencyUsd(projection.estimatedMonthlyIncome), sub: 'retiro del 4% anual', color: 'text-ink', bg: 'bg-ink/4 border-ink/8' },
+  ]
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="row g-4">
+    <div className="grid lg:grid-cols-12 gap-4">
 
-        {/* ── Simulador ── */}
-        <div className="col-lg-5">
-          <div className="p-4 rounded-4 h-100" style={cardStyle}>
-            <h5 className="fw-bold mb-4">Configura tu ahorro</h5>
+      {/* ── Simulador ── */}
+      <div className="lg:col-span-5">
+        <div className="bg-white border border-ink/8 rounded-2xl p-6 h-full">
+          <h5 className="font-display font-black text-ink text-lg mb-5">Configura tu ahorro</h5>
 
-            <div className="d-flex flex-column gap-4">
+          <div className="flex flex-col gap-5">
 
-              <div>
-                <div className="d-flex justify-content-between mb-2">
-                  <label className="small text-white-50">Aportación mensual (USDC)</label>
-                  <span className="fw-bold small" style={{ color: '#f59e0b' }}>
-                    {formatCurrencyUsd(scenario.monthlyDepositUsd)}
-                  </span>
-                </div>
-                <input type="number"
-                  className="form-control bg-transparent text-white border-secondary rounded-3"
-                  min={MANANA_SEGURO_RATES.minDeposit} step="1"
-                  value={scenario.monthlyDepositUsd}
-                  onChange={(e) => updateScenario('monthlyDepositUsd', e.target.value)}
-                />
-                {depositoBajo && (
-                  <div className="small mt-1" style={{ color: '#f59e0b' }}>
-                    ⚠ Mínimo ${MANANA_SEGURO_RATES.minDeposit} USDC por depósito
+            {/* Aportación mensual */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <label className="text-xs text-ink/50 font-medium">Aportación mensual (USDC)</label>
+                <span className="text-xs font-bold text-brand">{formatCurrencyUsd(scenario.monthlyDepositUsd)}</span>
+              </div>
+              <input
+                type="number"
+                className="w-full border border-ink/10 rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                min={MANANA_SEGURO_RATES.minDeposit}
+                step="1"
+                value={scenario.monthlyDepositUsd}
+                onChange={e => updateScenario('monthlyDepositUsd', e.target.value)}
+              />
+              {depositoBajo && (
+                <p className="text-xs text-brand mt-1.5">
+                  ⚠ Mínimo ${MANANA_SEGURO_RATES.minDeposit} USDC por depósito
+                </p>
+              )}
+              {scenario.monthlyDepositUsd >= MANANA_SEGURO_RATES.constancyMinDeposit && (
+                <p className="text-xs text-green-600 mt-1.5">
+                  ✓ Calificas para incentivo de constancia
+                </p>
+              )}
+            </div>
+
+            {/* Años al retiro */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <label className="text-xs text-ink/50 font-medium">Años al retiro</label>
+                <span className="text-xs font-bold text-ink">{scenario.yearsToRetirement} años</span>
+              </div>
+              <input
+                type="number"
+                className="w-full border border-ink/10 rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                min="5" max="40" step="5"
+                value={scenario.yearsToRetirement}
+                onChange={e => updateScenario('yearsToRetirement', e.target.value)}
+              />
+            </div>
+
+            {/* Tasa */}
+            <div className="bg-ink/3 border border-ink/6 rounded-xl p-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs text-ink/50">Tasa que recibirás</span>
+                <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${isLive
+                    ? 'bg-green-500/10 text-green-700 border-green-500/20'
+                    : 'bg-yellow-400/10 text-yellow-600 border-yellow-400/20'
+                  }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  {userRate}% APY
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Bruta CETES', val: `${cetesRate}%` },
+                  { label: 'Comisión plataforma', val: `−${platformRate}%` },
+                  { label: 'Para ti', val: `${userRate}%`, color: 'text-green-600' },
+                ].map(item => (
+                  <div key={item.label}>
+                    <p className="text-ink/35 mb-0.5" style={{ fontSize: 10 }}>{item.label}</p>
+                    <p className={`text-xs font-bold ${item.color ?? 'text-ink'}`}>{item.val}</p>
                   </div>
-                )}
-                {scenario.monthlyDepositUsd >= MANANA_SEGURO_RATES.constancyMinDeposit && (
-                  <div className="small mt-1" style={{ color: '#22c55e' }}>
-                    ✓ Calificas para incentivo de constancia
-                  </div>
-                )}
+                ))}
               </div>
+            </div>
 
-              <div>
-                <div className="d-flex justify-content-between mb-2">
-                  <label className="small text-white-50">Años al retiro</label>
-                  <span className="fw-bold small">{scenario.yearsToRetirement} años</span>
-                </div>
-                <input type="number"
-                  className="form-control bg-transparent text-white border-secondary rounded-3"
-                  min="5" max="40" step="5"
-                  value={scenario.yearsToRetirement}
-                  onChange={(e) => updateScenario('yearsToRetirement', e.target.value)}
-                />
+            {/* Incentivo */}
+            <div>
+              <label className="text-xs text-ink/50 font-medium mb-2 block">Incentivo cada 5 años</label>
+              <select
+                className="w-full border border-ink/10 rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all bg-white cursor-pointer"
+                value={scenario.incentiveScenario}
+                onChange={e => updateScenario('incentiveScenario', e.target.value)}>
+                {INCENTIVE_SCENARIOS.map(s => (
+                  <option key={s.key} value={s.key}>
+                    {s.label} — {s.pct}% del rendimiento
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-ink/40 mt-1.5">
+                {INCENTIVE_SCENARIOS.find(s => s.key === scenario.incentiveScenario)?.description}
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* ── Proyección ── */}
+      <div className="lg:col-span-7">
+        <div className="bg-white border border-ink/8 rounded-2xl p-6 h-full">
+          <h5 className="font-display font-black text-ink text-lg mb-5">Proyección de tu retiro</h5>
+
+          {/* 4 cards */}
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            {projCards.map(item => (
+              <div key={item.label} className={`border rounded-xl p-4 ${item.bg}`}>
+                <p className="text-xs text-ink/40 mb-1">{item.label}</p>
+                <p className={`text-lg font-bold mb-0.5 ${item.color}`}>{item.val}</p>
+                <p className="text-xs text-ink/35">{item.sub}</p>
               </div>
+            ))}
+          </div>
 
-              <div className="p-3 rounded-3"
-                style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="small text-white-50">Tasa que recibirás</span>
-                  <span className="d-flex align-items-center gap-1"
-                    style={{
-                      backgroundColor: isLive ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)',
-                      border: `1px solid ${isLive ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.3)'}`,
-                      borderRadius: 99, padding: '2px 8px', fontSize: 11, fontWeight: 700,
-                      color: isLive ? '#22c55e' : '#fbbf24',
-                    }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
-                    {userRate}% APY
-                  </span>
-                </div>
-                <div className="row g-2">
-                  {[
-                    { label: 'Bruta CETES', val: `${cetesRate}%` },
-                    { label: 'Comisión plataforma', val: `−${platformRate}%` },
-                    { label: 'Para ti', val: `${userRate}%`, color: '#22c55e' },
-                  ].map(item => (
-                    <div className="col-4" key={item.label}>
-                      <div className="small text-white-50" style={{ fontSize: 10 }}>{item.label}</div>
-                      <div className="small fw-bold" style={{ color: item.color ?? '#fff' }}>{item.val}</div>
-                    </div>
+          {/* Detalles */}
+          <div className="flex flex-col gap-0 mb-5">
+            {[
+              { label: 'Total aportado por ti', val: formatCurrencyUsd(projection.investedAmount) },
+              { label: 'Tasa usuario (Cetes − comisión)', val: `${formatPercentage(userRate)} anual` },
+              { label: 'Comisión plataforma', val: `${formatPercentage(MANANA_SEGURO_RATES.platformRate)} anual` },
+              { label: 'En pesos (tipo cambio $17)', val: formatCurrencyMxn(projection.projectedBalance * 17) },
+            ].map(item => (
+              <div key={item.label} className="flex justify-between py-2.5 border-b border-ink/5">
+                <span className="text-xs text-ink/45">{item.label}</span>
+                <span className="text-xs font-semibold text-ink">{item.val}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Toggle ciclos */}
+          <button
+            className="w-full border border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20 text-xs font-medium py-2.5 rounded-xl transition-all cursor-pointer"
+            onClick={() => setShowCycles(!showCycles)}>
+            {showCycles ? '▲ Ocultar ciclos de 5 años' : '▼ Ver desglose por ciclos de 5 años'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Ciclos ── */}
+      {showCycles && cycles.length > 0 && (
+        <div className="lg:col-span-12">
+          <div className="bg-white border border-ink/8 rounded-2xl p-6">
+            <h6 className="font-semibold text-ink mb-4">Ciclos de incentivo cada 5 años</h6>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-ink/40 text-xs border-b border-ink/6">
+                    <th className="text-left pb-2 font-medium">Ciclo</th>
+                    <th className="text-left pb-2 font-medium">Años</th>
+                    <th className="text-left pb-2 font-medium">Saldo inicio</th>
+                    <th className="text-left pb-2 font-medium">Saldo fin</th>
+                    <th className="text-left pb-2 font-medium">Rendimiento</th>
+                    <th className="text-left pb-2 font-medium text-yellow-600">Incentivo ({projection.incentivePct}%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cycles.map(c => (
+                    <tr key={c.cycle} className="border-b border-ink/4">
+                      <td className="py-2.5 font-semibold text-ink">{c.cycle}</td>
+                      <td className="py-2.5 text-ink/40">{c.yearStart}–{c.yearEnd}</td>
+                      <td className="py-2.5 text-ink">{formatCurrencyUsd(c.startBalance)}</td>
+                      <td className="py-2.5 text-brand font-semibold">{formatCurrencyUsd(c.endBalance)}</td>
+                      <td className="py-2.5 text-green-600 font-semibold">{formatCurrencyUsd(c.totalYield)}</td>
+                      <td className="py-2.5 text-yellow-600 font-semibold">+{formatCurrencyUsd(c.incentiveAmount)}</td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="small text-white-50 mb-2 d-block">Incentivo cada 5 años</label>
-                <select
-                  className="form-select bg-transparent text-white border-secondary rounded-3"
-                  style={{ backgroundColor: '#111' }}
-                  value={scenario.incentiveScenario}
-                  onChange={(e) => updateScenario('incentiveScenario', e.target.value)}
-                >
-                  {INCENTIVE_SCENARIOS.map((s) => (
-                    <option key={s.key} value={s.key} style={{ backgroundColor: '#111' }}>
-                      {s.label} — {s.pct}% del rendimiento
-                    </option>
-                  ))}
-                </select>
-                <div className="small text-white-50 mt-1">
-                  {INCENTIVE_SCENARIOS.find(s => s.key === scenario.incentiveScenario)?.description}
-                </div>
-              </div>
-
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
+      )}
 
-        {/* ── Proyección ── */}
-        <div className="col-lg-7">
-          <div className="p-4 rounded-4 h-100" style={cardStyle}>
-            <h5 className="fw-bold mb-4">Proyección de tu retiro</h5>
+      {/* ── Bloquear ── */}
+      <div className="lg:col-span-12">
+        <div className="bg-white border border-ink/8 rounded-2xl p-6">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
 
-            <div className="row g-3 mb-4">
-              {[
-                { label: 'Balance al retiro', val: formatCurrencyUsd(projection.projectedBalance), sub: 'incl. incentivos', color: '#f59e0b' },
-                { label: 'Ganancia por rendimiento', val: formatCurrencyUsd(projection.growthAmount), sub: 'sobre lo aportado', color: '#22c55e' },
-                { label: 'Incentivos acumulados', val: formatCurrencyUsd(projection.totalIncentives), sub: `${projection.incentivePct}% cada 5 años`, color: '#fbbf24' },
-                { label: 'Ingreso mensual retiro', val: formatCurrencyUsd(projection.estimatedMonthlyIncome), sub: 'retiro del 4% anual', color: '#fff' },
-              ].map(item => (
-                <div className="col-6" key={item.label}>
-                  <div className="p-3 rounded-4"
-                    style={{ backgroundColor: `rgba(${item.color === '#f59e0b' ? '59,130,246' : item.color === '#22c55e' ? '34,197,94' : item.color === '#fbbf24' ? '251,191,36' : '255,255,255'},0.08)`, border: `1px solid rgba(${item.color === '#f59e0b' ? '59,130,246' : item.color === '#22c55e' ? '34,197,94' : item.color === '#fbbf24' ? '251,191,36' : '255,255,255'},0.2)` }}>
-                    <div className="small text-white-50 mb-1">{item.label}</div>
-                    <div className="fw-bold fs-5" style={{ color: item.color }}>{item.val}</div>
-                    <div className="small text-white-50">{item.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="d-flex flex-column gap-2 mb-4">
-              {[
-                { label: 'Total aportado por ti', val: formatCurrencyUsd(projection.investedAmount) },
-                { label: 'Tasa usuario (Cetes − comisión)', val: `${formatPercentage(userRate)} anual` },
-                { label: 'Comisión plataforma', val: `${formatPercentage(MANANA_SEGURO_RATES.platformRate)} anual` },
-                { label: 'En pesos (tipo cambio $17)', val: formatCurrencyMxn(projection.projectedBalance * 17) },
-              ].map((item) => (
-                <div key={item.label} className="d-flex justify-content-between py-2"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span className="small text-white-50">{item.label}</span>
-                  <span className="small fw-bold">{item.val}</span>
-                </div>
-              ))}
+            <div>
+              <h5 className="font-display font-black text-ink text-lg mb-1">
+                Bloquear ahorro en Mañana Seguro
+              </h5>
+              <p className="text-sm text-ink/50">
+                Confirma tu aportación de{' '}
+                <strong className="text-ink">{formatCurrencyUsd(scenario.monthlyDepositUsd)} USDC</strong>.
+                Los fondos quedan bloqueados por contrato inteligente hasta tu meta.
+              </p>
             </div>
 
             <button
-              className="btn btn-sm w-100 rounded-3 mb-0"
-              style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', backgroundColor: 'transparent' }}
-              onClick={() => setShowCycles(!showCycles)}>
-              {showCycles ? '▲ Ocultar ciclos de 5 años' : '▼ Ver desglose por ciclos de 5 años'}
+              className={`shrink-0 w-full lg:w-auto px-8 py-3.5 rounded-xl font-semibold text-sm transition-all cursor-pointer ${estado === 'success'
+                  ? 'bg-green-500/10 text-green-700 border border-green-500/20 cursor-default'
+                  : depositoBajo
+                    ? 'bg-ink/5 text-ink/25 border border-ink/8 cursor-not-allowed'
+                    : 'bg-brand hover:bg-brand-dark text-white hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30'
+                }`}
+              onClick={handleBloquear}
+              disabled={estado === 'loading' || estado === 'success' || depositoBajo}>
+              {estado === 'loading' ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  Procesando...
+                </span>
+              ) : estado === 'success' ? '✓ Ahorro bloqueado' : '🔒 Bloquear ahorro'}
             </button>
           </div>
-        </div>
 
-        {/* ── Ciclos ── */}
-        {showCycles && cycles.length > 0 && (
-          <div className="col-12">
-            <div className="p-4 rounded-4" style={cardStyle}>
-              <h6 className="fw-bold mb-3">Ciclos de incentivo cada 5 años</h6>
-              <div className="table-responsive">
-                <table className="table table-dark table-borderless mb-0" style={{ fontSize: 13 }}>
-                  <thead>
-                    <tr className="text-white-50">
-                      <th>Ciclo</th><th>Años</th><th>Saldo inicio</th><th>Saldo fin</th><th>Rendimiento</th>
-                      <th style={{ color: '#fbbf24' }}>Incentivo ({projection.incentivePct}%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cycles.map((c) => (
-                      <tr key={c.cycle}>
-                        <td className="fw-bold">{c.cycle}</td>
-                        <td className="text-white-50">{c.yearStart}–{c.yearEnd}</td>
-                        <td>{formatCurrencyUsd(c.startBalance)}</td>
-                        <td style={{ color: '#f59e0b' }}>{formatCurrencyUsd(c.endBalance)}</td>
-                        <td style={{ color: '#22c55e' }}>{formatCurrencyUsd(c.totalYield)}</td>
-                        <td style={{ color: '#fbbf24' }}>+{formatCurrencyUsd(c.incentiveAmount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          {estado === 'success' && txHash && (
+            <div className="mt-4 bg-green-500/8 border border-green-500/20 rounded-xl px-4 py-3">
+              <p className="text-sm font-semibold text-green-700 mb-1">✅ Transacción confirmada en testnet</p>
+              <a href={txUrl} target="_blank" rel="noreferrer"
+                className="text-xs text-brand hover:text-brand-dark transition-colors">
+                Ver en Stellar Expert → {txHash.slice(0, 16)}...
+              </a>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── Bloquear ── */}
-        <div className="col-12">
-          <div className="p-4 rounded-4" style={cardStyle}>
-            <div className="row align-items-center g-4">
-              <div className="col-lg-8">
-                <h5 className="fw-bold mb-1">Bloquear ahorro en Mañana Seguro</h5>
-                <p className="text-white-50 small mb-0">
-                  Confirma tu aportación de{' '}
-                  <strong style={{ color: '#fff' }}>{formatCurrencyUsd(scenario.monthlyDepositUsd)} USDC</strong>.
-                  Los fondos quedan bloqueados por contrato inteligente hasta tu meta.
-                </p>
-              </div>
-              <div className="col-lg-4">
-                <button
-                  className="btn btn-lg w-100 py-3 rounded-4 fw-bold"
-                  style={{
-                    background: estado === 'success' ? 'rgba(34,197,94,0.15)' : depositoBajo ? 'rgba(255,255,255,0.05)' : 'linear-gradient(45deg, #d97706, #f59e0b)',
-                    border: estado === 'success' ? '1px solid rgba(34,197,94,0.3)' : depositoBajo ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                    color: estado === 'success' ? '#22c55e' : depositoBajo ? 'rgba(255,255,255,0.3)' : '#fff',
-                    cursor: depositoBajo ? 'not-allowed' : 'pointer',
-                  }}
-                  onClick={handleBloquear}
-                  disabled={estado === 'loading' || estado === 'success' || depositoBajo}>
-                  {estado === 'loading' ? (
-                    <span className="d-flex align-items-center justify-content-center gap-2">
-                      <span className="spinner-border spinner-border-sm" /> Procesando...
-                    </span>
-                  ) : estado === 'success' ? '✓ Ahorro bloqueado' : '🔒 Bloquear ahorro'}
-                </button>
-              </div>
+          {estado === 'error' && (
+            <div className="mt-4 bg-red-500/8 border border-dashed border-red-400/40 text-red-500 text-sm px-4 py-3 rounded-xl">
+              ⚠️ {errorMsg}
             </div>
-
-            {estado === 'success' && txHash && (
-              <div className="mt-3 p-3 rounded-4 small"
-                style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                <div className="fw-bold mb-1" style={{ color: '#22c55e' }}>✅ Transacción confirmada en testnet</div>
-                <a href={txUrl} target="_blank" rel="noreferrer" style={{ color: '#f59e0b' }}>
-                  Ver en Stellar Expert → {txHash.slice(0, 16)}...
-                </a>
-              </div>
-            )}
-            {estado === 'error' && (
-              <div className="mt-3 p-3 rounded-4 small"
-                style={{ backgroundColor: 'rgba(220,53,69,0.1)', border: '1px dashed rgba(220,53,69,0.4)', color: '#ff6b6b' }}>
-                ⚠️ {errorMsg}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-
       </div>
+
     </div>
   )
 }

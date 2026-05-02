@@ -1,67 +1,66 @@
 import { ConnectAccountCard } from '../features/access/components/ConnectAccountCard'
+import { useNavigate } from 'react-router-dom'
 
-export function HomeScreen() {
+export function HomeScreen({ usuario }) {
+  const navigate = useNavigate()
+
+  const stats = [
+    { val: '32M', label: 'Mexicanos sin pensión', color: 'text-brand' },
+    { val: '4.7% APY', label: 'Rendimiento en USDC', color: 'text-green-600' },
+    { val: '$2 USDC', label: 'Para empezar', color: 'text-brand' },
+    { val: '1%', label: 'Comisión plataforma', color: 'text-ink/60' },
+  ]
+
   return (
-    <section id="inicio" className="py-5"
-      style={{ backgroundColor: '#050505', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
-      <div className="container py-4">
-        <div className="row align-items-center g-5">
+    <section className="bg-surface py-16 lg:py-24">
+      <div className="container mx-auto px-4">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
           {/* Copy izquierdo */}
-          <div className="col-lg-6">
-            <div className="badge rounded-pill mb-3 px-3 py-2"
-              style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#D4AF37', border: '1px solid rgba(59,130,246,0.2)' }}>
+          <div className="anim-fade-up-1">
+            <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide mb-6">
               🔒 Ahorro para retiro · Etherfuse CETES · Stellar
-            </div>
+            </span>
 
-            <h2 className="fw-bold mb-4" style={{ letterSpacing: '-2px', lineHeight: 1, fontSize: '3rem' }}>
+            <h2 className="font-display font-black text-ink tracking-tight mb-4"
+              style={{ fontSize: 'clamp(2.2rem,5vw,3.2rem)', lineHeight: 1.05 }}>
               Mañana Seguro,<br />
-              <span style={{ opacity: 0.4 }}>empieza hoy.</span>
+              <em className="text-brand italic">empieza hoy.</em>
             </h2>
 
-            <p className="text-white-50 fs-5 mb-5 pe-lg-4">
+            <p className="text-ink/50 text-lg leading-relaxed max-w-md mb-8">
               Conecta tu wallet Freighter, deposita desde $2 USDC y bloquea
               tu ahorro en contrato inteligente. Sin banco, sin IMSS, sin burocracia.
             </p>
 
-            <div className="d-flex gap-3 flex-wrap mb-5">
-              <a href="#proyeccion"
-                className="btn btn-primary btn-lg px-5 py-3 rounded-4 fw-bold"
-                style={{ background: 'linear-gradient(45deg, #d97706, #f59e0b)', border: 'none' }}>
+            <div className="flex gap-3 flex-wrap mb-10">
+              <button
+                className="bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3.5 rounded-xl transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30 cursor-pointer"
+                onClick={() => navigate('/planner')}>
                 Ver simulador →
-              </a>
-              <a href="#dashboard"
-                className="btn btn-outline-secondary btn-lg px-5 py-3 rounded-4 fw-bold">
+              </button>
+              <button
+                className="border-[1.5px] border-ink/20 text-ink font-semibold px-6 py-3.5 rounded-xl hover:bg-ink/5 hover:border-ink/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard')}>
                 Mi dashboard
-              </a>
+              </button>
             </div>
 
-            {/* Stats alineadas al modelo */}
-            <div className="row g-3">
-              {[
-                { val: '32M', label: 'Mexicanos sin pensión', color: 'text-primary' },
-                { val: '4.7% APY', label: 'Rendimiento en USDC', color: 'text-success' },
-                { val: '$2 USDC', label: 'Para empezar', color: 'text-warning' },
-                { val: '1%', label: 'Comisión plataforma', color: 'text-info' },
-              ].map((s) => (
-                <div className="col-6" key={s.label}>
-                  <div className="p-3 rounded-4"
-                    style={{ backgroundColor: '#0c0c0c', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className={`fw-bold fs-4 ${s.color}`}>{s.val}</div>
-                    <div className="text-white-50 small">{s.label}</div>
-                  </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              {stats.map(s => (
+                <div key={s.label} className="bg-white border border-ink/8 rounded-2xl p-4">
+                  <div className={`font-display font-black text-2xl mb-1 ${s.color}`}>{s.val}</div>
+                  <div className="text-sm text-ink/45">{s.label}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ConnectAccountCard derecha */}
-          <div className="col-lg-5 offset-lg-1">
-            <div className="p-1 rounded-5"
-              style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)' }}>
-              <div className="p-4 rounded-5" style={{ backgroundColor: '#0c0c0c' }}>
-                <ConnectAccountCard />
-              </div>
+          {/* ConnectAccountCard */}
+          <div className="anim-fade-up-2">
+            <div className="bg-white rounded-3xl p-8 border border-ink/8 shadow-xl shadow-ink/5">
+              <ConnectAccountCard walletAddress={usuario?.walletAddress} />
             </div>
           </div>
 
