@@ -10,6 +10,11 @@ export async function conectarWallet() {
 
   await freighterApi.requestAccess()
   const { address } = await freighterApi.getAddress()
+
+  if (!address) {
+    throw new Error('Cancelaste la conexión o no se obtuvo la dirección.')
+  }
+
   return address
 }
 

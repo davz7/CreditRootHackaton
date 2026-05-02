@@ -80,7 +80,10 @@
     "nombreLabel": "Nombre",
     "nombrePlaceholder": "Ej. Juan Pérez",
     "entrar": "Entrar a mi retiro →",
-    "cambiarWallet": "← Cambiar wallet"
+    "cambiarWallet": "← Cambiar wallet",
+    "continuarGoogle": "Continuar con Google",
+    "continuarEmail": "Continuar con email",
+    "usarFreighter": "Usar Freighter (avanzado)"
   },
   "footer": {
     "stellar": "Construido sobre Stellar",

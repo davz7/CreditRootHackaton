@@ -80,7 +80,10 @@
     "nombreLabel": "Name",
     "nombrePlaceholder": "E.g. John Smith",
     "entrar": "Enter my retirement →",
-    "cambiarWallet": "← Change wallet"
+    "cambiarWallet": "← Change wallet",
+    "continuarGoogle": "Continue with Google",
+    "continuarEmail": "Continue with email",
+    "usarFreighter": "Use Freighter (advanced)"
   },
   "footer": {
     "stellar": "Built on Stellar",
