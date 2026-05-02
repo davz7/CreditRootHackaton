@@ -4,7 +4,7 @@ import { INCENTIVE_SCENARIOS } from '../../../data/retirementContent'
 /**
  * ReferralModule — Sistema de referidos de Mañana Seguro
  *
- * Reglas del modelo de negocio:
+ * Reglas del modelo de negocio: 
  * - Referido válido: 6 meses activo + al menos 1 depósito
  * - 1 referido activo → incentivo sube de 5% a 6%
  * - 2 referidos activos → incentivo sube a 7% (o 9% con constancia)
@@ -270,11 +270,14 @@ function loadReferrals() {
   try {
     const raw = localStorage.getItem('manana_seguro_referrals')
     return raw ? JSON.parse(raw) : getMockReferrals()
-  } catch { return getMockReferrals() }
+  } catch { /* storage no disponible */ }
+  return getMockReferrals()
 }
 
 function saveReferrals(referrals) {
-  try { localStorage.setItem('manana_seguro_referrals', JSON.stringify(referrals)) } catch { }
+  try {
+    localStorage.setItem('manana_seguro_referrals', JSON.stringify(referrals))
+  } catch { /* storage no disponible */ }
 }
 
 function getMockReferrals() {

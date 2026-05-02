@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { retirarFondos, enviarTransaccion, verBalanceContrato, verFechaRetiro } from '../../../lib/stellar'
 import { firmarTransaccion } from '../../../lib/wallet'
 import { useEtherfuseRate } from '../../../hooks/useEtherfuseRate'
@@ -16,28 +16,26 @@ export function WithdrawalFlow({ meta = 10000 }) {
   const [errorMsg, setErrorMsg] = useState(null)
   const [resumenFinal, setResumenFinal] = useState(null)
 
-  useEffect(() => { verificarEstado() }, [])
 
-  async function verificarEstado() {
+  const verificarEstado = useCallback(async () => {
     setFase('verificando')
     setErrorMsg(null)
     try {
       const { address: addr } = await freighterApi.getAddress()
       if (!addr) throw new Error('Wallet no conectada — abre Freighter y vuelve a intentar')
       setAddress(addr)
-
       const saldo = await verBalanceContrato(addr)
       setSaldoContrato(Number(saldo))
-
       try { setFechaRetiro(await verFechaRetiro(addr)) }
-      catch { setFechaRetiro('Pendiente de primer depósito') }
-
+      catch { /* fecha pendiente */ }
       setFase(Number(saldo) >= meta ? 'alcanzada' : 'no_alcanzada')
     } catch (err) {
       setErrorMsg(err.message ?? 'No se pudo conectar con el contrato')
       setFase('error')
     }
-  }
+  }, [meta])
+
+  useEffect(() => { verificarEstado() }, [verificarEstado])
 
   async function handleRetirar() {
     setFase('procesando')

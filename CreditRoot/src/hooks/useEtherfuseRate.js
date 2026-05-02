@@ -65,11 +65,17 @@ function loadFromCache() {
     const { rate, ts } = JSON.parse(raw)
     if (Date.now() - ts > CACHE_TTL_MS) return null
     return { rate, ts }
-  } catch { return null }
+  } catch { 
+    // cache corrupto o localStorage no disponible
+    return null 
+  }
 }
 
 function saveToCache(rate) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ rate, ts: Date.now() }))
-  } catch {}
+  } catch {
+    // fallo silencioso — el cache es opcional
+  }
 }
+

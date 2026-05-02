@@ -6,7 +6,7 @@ import { formatCurrencyUsd, formatCurrencyMxn, formatPercentage } from '../../..
 import { calculateCycles } from '../../../utils/projections'
 import { lockFunds, enviarTransaccion } from '../../../lib/stellar'
 import { firmarTransaccion } from '../../../lib/wallet'
-import { buildHistoryEntry, addHistoryEntry } from '../../dashboard/components/ContributionHistory'
+import { buildHistoryEntry, addHistoryEntry } from '../dashboard/components/contributionHistoryUtils'
 import freighterApi from '@stellar/freighter-api'
 
 export function ContributionPlanner() {
@@ -114,8 +114,8 @@ export function ContributionPlanner() {
               <div className="flex justify-between items-center mb-3">
                 <span className="text-xs text-ink/50">Tasa que recibirás</span>
                 <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${isLive
-                    ? 'bg-green-500/10 text-green-700 border-green-500/20'
-                    : 'bg-yellow-400/10 text-yellow-600 border-yellow-400/20'
+                  ? 'bg-green-500/10 text-green-700 border-green-500/20'
+                  : 'bg-yellow-400/10 text-yellow-600 border-yellow-400/20'
                   }`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
                   {userRate}% APY
@@ -250,10 +250,10 @@ export function ContributionPlanner() {
 
             <button
               className={`shrink-0 w-full lg:w-auto px-8 py-3.5 rounded-xl font-semibold text-sm transition-all cursor-pointer ${estado === 'success'
-                  ? 'bg-green-500/10 text-green-700 border border-green-500/20 cursor-default'
-                  : depositoBajo
-                    ? 'bg-ink/5 text-ink/25 border border-ink/8 cursor-not-allowed'
-                    : 'bg-brand hover:bg-brand-dark text-white hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30'
+                ? 'bg-green-500/10 text-green-700 border border-green-500/20 cursor-default'
+                : depositoBajo
+                  ? 'bg-ink/5 text-ink/25 border border-ink/8 cursor-not-allowed'
+                  : 'bg-brand hover:bg-brand-dark text-white hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30'
                 }`}
               onClick={handleBloquear}
               disabled={estado === 'loading' || estado === 'success' || depositoBajo}>

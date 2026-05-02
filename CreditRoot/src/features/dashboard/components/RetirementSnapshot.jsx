@@ -75,9 +75,14 @@ export function RetirementSnapshot() {
         try { setFechaRetiro(await verFechaRetiro(address)) }
         catch { setFechaRetiro('Pendiente de primer depósito') }
 
-        try { setLockedBalance(Number(await verBalanceContrato(address))) } catch { }
-        try { const m = await verMeta(address); if (m > 0) setMeta(Number(m)) } catch { }
-        try { setDepositCount(Number(await verDepositos(address))) } catch { }
+        try { setLockedBalance(Number(await verBalanceContrato(address))) }
+        catch { /* saldo en 0 si no hay depósitos */ }
+
+        try { const m = await verMeta(address); if (m > 0) setMeta(Number(m)) }
+        catch { /* meta default 10000 */ }
+
+        try { setDepositCount(Number(await verDepositos(address))) }
+        catch { /* 0 depósitos */ }
 
       } catch (err) {
         setError(err.message)
@@ -213,8 +218,8 @@ export function RetirementSnapshot() {
                   aria-controls={`panel-${t.key}`}
                   tabIndex={activeTab === t.key ? 0 : -1}
                   className={`shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap ${activeTab === t.key
-                      ? 'bg-brand/10 border-brand/30 text-brand'
-                      : 'bg-transparent border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20'
+                    ? 'bg-brand/10 border-brand/30 text-brand'
+                    : 'bg-transparent border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20'
                     }`}
                   onClick={() => setActiveTab(t.key)}
                   onKeyDown={e => handleTabKeyDown(e, index)}>

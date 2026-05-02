@@ -4,7 +4,7 @@ import LandingNavbar from './components/LandingNavbar'
 import { conectarWallet } from '../lib/wallet'
 import ardilla from '../assets/Ardilla_vector.png'
 
-export function AuthScreen({ modo, onAuth, onVolver }) {
+export function AuthScreen({ onAuth, onVolver }) {
     const [paso, setPaso] = useState('wallet') // 'wallet' | 'nombre'
     const [walletAddress, setWalletAddress] = useState(null)
     const [nombre, setNombre] = useState('')

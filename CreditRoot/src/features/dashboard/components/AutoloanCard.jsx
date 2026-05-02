@@ -27,7 +27,7 @@ export function AutoloanCard({ lockedBalance = 0, walletAddress = null }) {
 
   // ── Estado de la UI ──────────────────────────────────────────────────────────
   // 'cargando' | 'form' | 'confirmando' | 'procesando' | 'activo' | 'error'
-  const [fase, setFase] = useState('cargando')
+  const [fase, setFase] = useState(() => walletAddress ? 'loading' : 'form')
   const [txHash, setTxHash] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
 
@@ -53,7 +53,7 @@ export function AutoloanCard({ lockedBalance = 0, walletAddress = null }) {
 
   // ── Leer estado del préstamo desde el contrato al montar ──────────────────────
   useEffect(() => {
-    if (!walletAddress) { setFase('form'); return }
+    if (!walletAddress) return
     async function cargarPrestamo() {
       try {
         const { saldo, meses } = await verPrestamo(walletAddress)
@@ -65,7 +65,7 @@ export function AutoloanCard({ lockedBalance = 0, walletAddress = null }) {
           setFase('form')
         }
       } catch {
-        // Si el contrato aún no tiene datos, mostramos el formulario
+        /* contrato sin datos aún — mostramos formulario */
         setFase('form')
       }
     }

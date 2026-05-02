@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { calculateRetirementProjection, calculateCycles } from '../../src/utils/projections'
 import { useRetirementProjection } from '../../src/hooks/useRetirementProjection'
 import { renderHook, act } from '@testing-library/react'
@@ -10,7 +10,7 @@ describe('calculateRetirementProjection', () => {
       yearsToRetirement: 20,
       annualYieldRate: 4.7,
     })
-
+ 
     expect(result.investedAmount).toBe(6000)
     expect(result.projectedBalance).toBeGreaterThan(6000)
     expect(result.estimatedMonthlyIncome).toBeGreaterThan(0)
@@ -59,12 +59,7 @@ describe('calculateRetirementProjection', () => {
       incentiveScenario: 'solo_fidelidad',
     })
 
-    const resultNoIncentive = calculateRetirementProjection({
-      monthlyDepositUsd: 25,
-      yearsToRetirement: 5,
-      annualYieldRate: 4.7,
-      incentiveScenario: 'todo',
-    })
+
 
     expect(resultDefault.totalIncentives).toBeGreaterThan(0)
     expect(resultDefault.incentivePct).toBe(5)
