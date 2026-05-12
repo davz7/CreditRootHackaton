@@ -183,7 +183,7 @@ export function AutoloanCard({ lockedBalance = 0, walletAddress = null }) {
               style={{ accentColor: '#fbbf24' }}
             />
             <div className="flex justify-between">
-              <span className="text-xs text-ink/35 dark:text-white/35">$10 USDC</span>
+              <span className="text-xs text-ink/35 dark:text-white/35">$170 MXN</span>
               <span className="text-xs text-ink/35 dark:text-white/35">{formatCurrencyUsd(maxLoan)} máx.</span>
             </div>
           </div>
@@ -275,7 +275,7 @@ export function AutoloanCard({ lockedBalance = 0, walletAddress = null }) {
           <p className="text-sm text-ink/50 dark:text-white/50 mb-2">
             {t('autoloan.confirmarDesc', { monto: formatCurrencyUsd(loan.amount), pago: formatCurrencyUsd(loan.monthlyPayment) })}
           </p>
-          <p className="text-xs text-green-500 mb-6">{t('autoloan.confirmarFreighter')}</p>
+          <p className="text-xs text-green-500 mb-6">{"Freighter firmará la transacción para completar el préstamo."}</p>
           <div className="flex gap-3 justify-center">
             <button
               className="px-5 py-2.5 rounded-xl text-sm font-medium border border-ink/10 dark:border-white/10 text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-all cursor-pointer"

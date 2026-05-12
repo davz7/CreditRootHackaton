@@ -1,16 +1,23 @@
 import { ConnectAccountCard } from '../features/access/components/ConnectAccountCard'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useEtherfuseRate } from '../hooks/useEtherfuseRate'
+import { useExchangeRate } from '../hooks/useExchangeRate'
 
 export function HomeScreen({ usuario }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { userRate, cetesRate, isLive: rateIsLive, loading: rateLoading } = useEtherfuseRate()
+  const { usdMxn, loading: fxLoading } = useExchangeRate()
+
+  const loading = rateLoading || fxLoading
+  const apyDisplay = loading ? '···' : userRate > 0 ? `${userRate.toFixed(1)}% APY` : '—'
 
   const stats = [
-    { val: '32M', label: t('home.stats.mexicanos'), color: 'text-brand' },
-    { val: '4.7% APY', label: t('home.stats.rendimiento'), color: 'text-green-600' },
-    { val: '$2 USDC', label: t('home.stats.empezar'), color: 'text-brand' },
-    { val: '1%', label: t('home.stats.comision'), color: 'text-ink/60 dark:text-white/60' },
+    { val: '32M',        label: 'Mexicanos sin pensión',      color: 'text-brand' },
+    { val: apyDisplay,   label: 'Rendimiento anual en pesos', color: 'text-green-600' },
+    { val: '$100 MXN',   label: 'Para empezar',               color: 'text-brand' },
+    { val: '1%',         label: 'Comisión plataforma',        color: 'text-ink/60 dark:text-white/60' },
   ]
 
   return (
@@ -18,10 +25,9 @@ export function HomeScreen({ usuario }) {
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
-          {/* Copy izquierdo */}
           <div className="anim-fade-up-1">
             <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide mb-6">
-              {t('home.badge')}
+              🔒 Ahorro para retiro · CETES · Hecho en México
             </span>
 
             <h2 className="font-display font-black text-ink dark:text-white tracking-tight mb-4"
@@ -31,7 +37,7 @@ export function HomeScreen({ usuario }) {
             </h2>
 
             <p className="text-ink/50 dark:text-white/50 text-lg leading-relaxed max-w-md mb-8">
-              {t('home.descripcion')}
+              Conecta tu cuenta de banco, empieza a ahorrar con SPEI desde $100 pesos. {t('home.descripcion')}
             </p>
 
             <div className="flex gap-3 flex-wrap mb-10">
@@ -47,21 +53,41 @@ export function HomeScreen({ usuario }) {
               </button>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-2 gap-3">
               {stats.map(s => (
                 <div key={s.label} className="bg-white dark:bg-white/5 border border-ink/8 dark:border-white/8 rounded-2xl p-4">
-                  <div className={`font-display font-black text-2xl mb-1 ${s.color}`}>{s.val}</div>
+                  <div className={`font-display font-black text-2xl mb-1 transition-all ${s.color} ${loading && s.val === apyDisplay ? 'animate-pulse' : ''}`}>
+                    {s.val}
+                  </div>
                   <div className="text-sm text-ink/45 dark:text-white/45">{s.label}</div>
                 </div>
               ))}
             </div>
+
+            {/* Indicadores en vivo */}
+            {!loading && (
+              <div className="flex flex-col gap-1 mt-4">
+                {rateIsLive && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-ink/35 dark:text-white/35">
+                      CETES en vivo · {cetesRate.toFixed(2)}% bruto vía Banxico
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-xs text-ink/35 dark:text-white/35">
+                    Tipo de cambio · ${usdMxn.toFixed(2)} MXN/USD vía Banxico
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ConnectAccountCard */}
           <div className="anim-fade-up-2">
             <div className="bg-white dark:bg-white/5 rounded-3xl p-8 border border-ink/8 dark:border-white/8 shadow-xl shadow-ink/5">
-              <ConnectAccountCard walletAddress={usuario?.walletAddress} />
+              <ConnectAccountCard usuario={usuario} />
             </div>
           </div>
 

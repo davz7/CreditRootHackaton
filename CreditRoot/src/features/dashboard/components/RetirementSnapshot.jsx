@@ -1,39 +1,65 @@
-import { useEffect, useState } from 'react'
+// src/features/dashboard/components/RetirementSnapshot.jsx
+//
+// ─── ISO 25010 ───────────────────────────────────────────────────────────────
+// Seguridad:      Lee usuario del localStorage — nunca expone datos ajenos.
+// Fiabilidad:     Manejo de errores en cada fetch. Estados de carga explícitos.
+// Mantenibilidad: Lógica de metas separada en GoalCard/GoalSetup.
+// Usabilidad:     Primera vez → configurador de meta. Regresa → dashboard completo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getBalances, verFechaRetiro, verBalanceContrato, verMeta, verDepositos } from '../../../lib/stellar'
-import freighterApi from '@stellar/freighter-api'
 import { useEtherfuseRate } from '../../../hooks/useEtherfuseRate'
 import { MANANA_SEGURO_RATES } from '../../../data/retirementContent'
 import { calculateCycles } from '../../../utils/projections'
-import { formatCurrencyUsd } from '../../../utils/formatters'
+import { formatCurrencyUsd, formatCurrencyMxn } from '../../../utils/formatters'
+import { useYieldCounterDirectMxn } from '../../../hooks/useYieldCounter'
+
 import { AutoloanCard } from './AutoloanCard'
 import { ContributionHistory } from './ContributionHistory'
 import { ReferralModule } from '../../referrals/components/ReferralModule'
 import { CarlosSimulator } from '../../simulator/components/CarlosSimulator'
 import { RateBadge } from '../../../components/common/RateBadge'
+import { DepositFlow } from '../../deposit/components/DepositFlow'
+import { GoalCard, GoalEditModal, AddGoalButton } from '../../goals/components/GoalCard'
+import { GoalSetup as GoalSetupComponent } from '../../goals/components/GoalSetup'
 
 export function RetirementSnapshot() {
   const { t } = useTranslation()
-  const [balances, setBalances] = useState(null)
-  const [address, setAddress] = useState(null)
-  const [fechaRetiro, setFechaRetiro] = useState(null)
+
+  // ── Estado de datos ───────────────────────────────────────────────────────
   const [lockedBalance, setLockedBalance] = useState(0)
-  const [meta, setMeta] = useState(10000)
-  const [depositCount, setDepositCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('resumen')
+  const [showDeposit, setShowDeposit] = useState(false)
 
+  // ── Estado de metas ───────────────────────────────────────────────────────
+  const [metas, setMetas] = useState([])          // todas las metas del usuario
+  const [metaSeleccionada, setMetaSeleccionada] = useState(null)
+  const metaIniciadaRef = useRef(false) // evita loop infinito
+  const [metaEditando, setMetaEditando] = useState(null)
+  const [loadingMetas, setLoadingMetas] = useState(true)
+
+  // ── Hooks de tasas ────────────────────────────────────────────────────────
   const { cetesRate, userRate, platformRate } = useEtherfuseRate()
 
+  // ── Contador animado de rendimiento ──────────────────────────────────────
+  const {
+    isGrowing,
+    yieldTodayMxn: yieldTodayMxnAnimado,
+    displayBalance: saldoAnimado,
+  } = useYieldCounterDirectMxn(lockedBalance, userRate, lockedBalance > 0)
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
   const tabs = [
-    { key: 'resumen', label: t('snapshot.tabs.resumen') },
+    { key: 'resumen',   label: t('snapshot.tabs.resumen') },
     { key: 'historial', label: t('snapshot.tabs.historial') },
-    { key: 'ciclos', label: t('snapshot.tabs.ciclos') },
-    { key: 'prestamo', label: t('snapshot.tabs.prestamo') },
+    { key: 'ciclos',    label: t('snapshot.tabs.ciclos') },
+    { key: 'prestamo',  label: t('snapshot.tabs.prestamo') },
     { key: 'referidos', label: t('snapshot.tabs.referidos') },
-    { key: 'carlos', label: t('snapshot.tabs.carlos') },
-    { key: 'ingresos', label: t('snapshot.tabs.ingresos') },
+    { key: 'carlos',    label: t('snapshot.tabs.carlos') },
+    { key: 'ingresos',  label: t('snapshot.tabs.ingresos') },
   ]
 
   function handleTabKeyDown(e, currentIndex) {
@@ -42,49 +68,119 @@ export function RetirementSnapshot() {
       e.preventDefault(); newIndex = (currentIndex + 1) % tabs.length
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault(); newIndex = (currentIndex - 1 + tabs.length) % tabs.length
-    } else if (e.key === 'Home') {
-      e.preventDefault(); newIndex = 0
-    } else if (e.key === 'End') {
-      e.preventDefault(); newIndex = tabs.length - 1
-    } else return
+    } else if (e.key === 'Home') { e.preventDefault(); newIndex = 0 }
+    else if (e.key === 'End') { e.preventDefault(); newIndex = tabs.length - 1 }
+    else return
     setActiveTab(tabs[newIndex].key)
     setTimeout(() => { document.getElementById(`tab-${tabs[newIndex].key}`)?.focus() }, 0)
   }
 
-  useEffect(() => {
-    async function cargarDatos() {
-      try {
-        const { address } = await freighterApi.getAddress()
-        if (!address) throw new Error('Wallet no conectada')
-        setAddress(address)
-        const data = await getBalances(address)
-        const xlm = data.find(b => b.asset_type === 'native')
-        const usdc = data.find(b => b.asset_code === 'USDC')
-        setBalances({
-          xlm: xlm ? parseFloat(xlm.balance).toFixed(2) : '0.00',
-          usdc: usdc ? parseFloat(usdc.balance).toFixed(2) : '0.00',
-        })
-        try { setFechaRetiro(await verFechaRetiro(address)) }
-        catch { setFechaRetiro('Pendiente de primer depósito') }
-        try { setLockedBalance(Number(await verBalanceContrato(address))) }
-        catch { /* saldo en 0 */ }
-        try { const m = await verMeta(address); if (m > 0) setMeta(Number(m)) }
-        catch { /* meta default */ }
-        try { setDepositCount(Number(await verDepositos(address))) }
-        catch { /* 0 depósitos */ }
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
+  // ── Cargar órdenes completadas ────────────────────────────────────────────
+  const cargarDatos = useCallback(async () => {
+    try {
+      const usuarioGuardado = JSON.parse(localStorage.getItem('ms_usuario') || 'null')
+      if (!usuarioGuardado?.id) throw new Error('Sin sesión activa')
+
+      const res = await fetch(`/api/etherfuse/order-status?usuarioId=${usuarioGuardado.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        const totalMxn = data.ordenes
+          ?.filter(o => o.status === 'completed')
+          ?.reduce((sum, o) => sum + Number(o.monto_mxn), 0) ?? 0
+        setLockedBalance(totalMxn)
       }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    cargarDatos()
   }, [])
 
-  const usdcLibre = balances ? parseFloat(balances.usdc) : 0
-  const proyeccion20 = (lockedBalance * Math.pow(1 + userRate / 100, 20)).toFixed(2)
+  // ── Cargar metas del usuario ──────────────────────────────────────────────
+  const cargarMetas = useCallback(async () => {
+    try {
+      const usuarioGuardado = JSON.parse(localStorage.getItem('ms_usuario') || 'null')
+      if (!usuarioGuardado?.id) return
+
+      const res = await fetch(`/api/metas?usuarioId=${usuarioGuardado.id}`)
+      if (!res.ok) return
+      const data = await res.json()
+      const metasData = data.metas ?? []
+      setMetas(metasData)
+
+      // Seleccionar la meta principal solo la primera vez — usar ref para
+      // evitar que metaSeleccionada sea dependencia y cause loop infinito
+      if (metasData.length > 0 && !metaIniciadaRef.current) {
+        metaIniciadaRef.current = true
+        const principal = metasData.find(m => m.es_principal) ?? metasData[0]
+        setMetaSeleccionada(principal)
+      }
+    } catch {
+      // fallo silencioso — las metas son opcionales en el render
+    } finally {
+      setLoadingMetas(false)
+    }
+  }, []) // sin dependencias — metaIniciadaRef es estable
+
+  useEffect(() => {
+    cargarDatos()
+    cargarMetas()
+  }, [cargarDatos, cargarMetas])
+
+  // ── Cuando se crea una nueva meta ─────────────────────────────────────────
+  function handleMetaCreada(nuevaMeta) {
+    setMetas(prev => [...prev, nuevaMeta])
+    setMetaSeleccionada(nuevaMeta)
+  }
+
+  // ── Cuando se edita una meta ──────────────────────────────────────────────
+  function handleMetaEditada(metaActualizada) {
+    setMetas(prev => prev.map(m => m.id === metaActualizada.id ? metaActualizada : m))
+    if (metaSeleccionada?.id === metaActualizada.id) setMetaSeleccionada(metaActualizada)
+    setMetaEditando(null)
+  }
+
+  // ── Cuando se elimina una meta ────────────────────────────────────────────
+  async function handleEliminarMeta(meta) {
+    const usuario = JSON.parse(localStorage.getItem('ms_usuario') || 'null')
+    if (!usuario?.id) return
+    if (!confirm(`¿Eliminar la meta "${meta.nombre}"? Esta acción no se puede deshacer.`)) return
+
+    try {
+      const res = await fetch(`/api/metas?id=${meta.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuarioId: usuario.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error); return }
+      const metasRestantes = metas.filter(m => m.id !== meta.id)
+      setMetas(metasRestantes)
+      if (metaSeleccionada?.id === meta.id) {
+        setMetaSeleccionada(metasRestantes.find(m => m.es_principal) ?? metasRestantes[0] ?? null)
+      }
+    } catch { /* fallo silencioso */ }
+  }
+
+  // ── Cálculos de la meta seleccionada ─────────────────────────────────────
+  const metaMxn = metaSeleccionada?.monto_objetivo_mxn ?? 10000
+  const lockedBalanceMxn = lockedBalance  // ya en MXN desde Supabase
+  const proyeccion20Mxn = lockedBalance * Math.pow(1 + userRate / 100, 20)
+
+  // Fecha estimada de retiro basada en meta seleccionada
+  const fechaRetiroEstimada = (() => {
+    if (!metaSeleccionada || lockedBalance <= 0) return 'Calculando...'
+    const anosRestantes = metaSeleccionada.anos_al_retiro
+    const anioRetiro = new Date().getFullYear() + anosRestantes
+    return `${anioRetiro} (~${anosRestantes} años)`
+  })()
+
   const cycles = calculateCycles(25, 20, userRate, 9)
   const skeletonLabels = t('snapshot.skeletonLabels', { returnObjects: true })
+
+  const usuario = JSON.parse(localStorage.getItem('ms_usuario') || 'null')
+  const tieneMetas = metas.length > 0
+  const primeraVez = !loadingMetas && !tieneMetas
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,10 +191,8 @@ export function RetirementSnapshot() {
           <span className="inline-block bg-brand/10 text-brand-dark border border-brand/20 rounded-lg px-3 py-1.5 text-xs font-semibold">
             {t('snapshot.badge')}
           </span>
-          {address && (
-            <span className="text-xs text-ink/40 dark:text-white/40 font-mono">
-              {address.slice(0, 8)}...{address.slice(-8)}
-            </span>
+          {usuario?.email && (
+            <span className="text-xs text-ink/40 dark:text-white/40">{usuario.email}</span>
           )}
         </div>
         <h2 className="font-display font-black text-ink dark:text-white tracking-tight mb-2"
@@ -108,10 +202,72 @@ export function RetirementSnapshot() {
         <RateBadge compact />
       </div>
 
+      {/* ── PRIMERA VEZ: Configurador de meta ── */}
+      {primeraVez && usuario && (
+        <GoalSetupComponent usuario={usuario} onMetaCreada={handleMetaCreada} />
+      )}
+
+      {/* ── CON METAS: Botón depositar + row de metas ── */}
+      {tieneMetas && (
+        <>
+          {/* Botón depositar — arriba de todo cuando ya hay meta */}
+          {!showDeposit && (
+            <button
+              onClick={() => setShowDeposit(true)}
+              className="mt-1 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-brand/30 cursor-pointer">
+              + {t('deposit.depositarBtn')}
+            </button>
+          )}
+
+          {showDeposit && usuario && (
+            <DepositFlow
+              usuarioId={usuario.id}
+              kycStatus={usuario.kycStatus ?? 'pending'}
+              metaId={metas.length === 1 ? metas[0].id : metaSeleccionada?.id}
+              metas={metas.length > 1 ? metas : null}
+              onComplete={() => { setShowDeposit(false); cargarDatos() }}
+              onClose={() => setShowDeposit(false)}
+            />
+          )}
+
+          {/* Row de tarjetas de metas */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h6 className="font-semibold text-ink dark:text-white text-sm">Tus Metas Activas</h6>
+            </div>
+            <div className={`grid gap-3 ${metas.length === 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+              {metas.map(meta => (
+                <GoalCard
+                  key={meta.id}
+                  meta={meta}
+                  saldoMxn={meta.id === metaSeleccionada?.id ? lockedBalanceMxn : 0}
+                  seleccionada={meta.id === metaSeleccionada?.id}
+                  onSeleccionar={() => setMetaSeleccionada(meta)}
+                  onEditar={() => setMetaEditando(meta)}
+                  onEliminar={() => handleEliminarMeta(meta)}
+                  puedeEliminar={metas.length > 1}
+                />
+              ))}
+              {/* Botón agregar nueva meta */}
+              <AddGoalButton usuarioId={usuario?.id} onMetaCreada={handleMetaCreada} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Modal de edición ── */}
+      {metaEditando && usuario && (
+        <GoalEditModal
+          meta={metaEditando}
+          usuarioId={usuario.id}
+          onGuardado={handleMetaEditada}
+          onCerrar={() => setMetaEditando(null)}
+        />
+      )}
+
       {/* ── Skeleton ── */}
       {loading && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3"
-          aria-busy="true" aria-label="Cargando datos del dashboard">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3" aria-busy="true">
           {skeletonLabels.map(label => (
             <div key={label} className="bg-ink/4 dark:bg-white/4 border border-ink/6 dark:border-white/6 rounded-2xl p-4 h-28">
               <div className="text-transparent text-xs select-none mb-3">{label}</div>
@@ -125,23 +281,13 @@ export function RetirementSnapshot() {
       {/* ── Error ── */}
       {error && (
         <div className="bg-ink/5 dark:bg-white/5 border border-brand/20 rounded-2xl p-5">
-          {error.includes('Freighter') || error.includes('not installed') ? (
+          {error.includes('sesión') || error.includes('Sin sesión') ? (
             <div>
-              <p className="font-semibold text-ink dark:text-white mb-1">{t('snapshot.errorFreighter')}</p>
-              <p className="text-sm text-ink/50 dark:text-white/50 mb-3">{t('snapshot.errorFreighterDesc')}</p>
-              <a href="https://freighter.app/" target="_blank" rel="noopener noreferrer"
-                className="text-sm text-brand font-semibold hover:text-brand-dark transition-colors">
-                {t('snapshot.errorFreighterLink')}
-              </a>
-            </div>
-          ) : error.includes('connected') || error.includes('conectada') ? (
-            <div>
-              <p className="font-semibold text-ink dark:text-white mb-1">{t('snapshot.errorWallet')}</p>
-              <p className="text-sm text-ink/50 dark:text-white/50 mb-3">{t('snapshot.errorWalletDesc')}</p>
-              <button
-                className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer"
-                onClick={() => window.location.reload()}>
-                {t('snapshot.errorWalletBtn')}
+              <p className="font-semibold text-ink dark:text-white mb-1">⚠️ No hay sesión activa</p>
+              <p className="text-sm text-ink/50 dark:text-white/50 mb-3">Inicia sesión para ver tu dashboard.</p>
+              <button className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-xl cursor-pointer"
+                onClick={() => window.location.href = '/login'}>
+                Iniciar sesión
               </button>
             </div>
           ) : (
@@ -153,67 +299,81 @@ export function RetirementSnapshot() {
         </div>
       )}
 
-      {balances && (
+      {/* ── Stat cards + tabs — solo cuando tiene metas y datos cargados ── */}
+      {tieneMetas && !loading && (
         <>
-          {/* ── Stat cards ── */}
+          {/* 4 Stat cards — cambian según meta seleccionada */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
               {
-                label: t('snapshot.statUsdcWallet'),
-                val: `$${usdcLibre.toFixed(2)}`,
-                sub: t('snapshot.statUsdcWalletSub'),
+                label: 'Saldo disponible',
+                val: formatCurrencyMxn(0),
+                sub: 'Próximamente',
                 color: 'text-brand',
               },
               {
-                label: t('snapshot.statUsdcBloqueado'),
-                val: formatCurrencyUsd(lockedBalance),
-                sub: depositCount !== 1
-                  ? t('snapshot.statUsdcBloqueadoSubPlural', { n: depositCount })
-                  : t('snapshot.statUsdcBloqueadoSub', { n: depositCount }),
-                color: 'text-green-600',
+                label: 'Ahorro bloqueado',
+                val: isGrowing
+                  ? new Intl.NumberFormat('es-MX', {
+                      style: 'currency', currency: 'MXN',
+                      minimumFractionDigits: 5, maximumFractionDigits: 5,
+                    }).format(saldoAnimado)
+                  : formatCurrencyMxn(lockedBalanceMxn),
+                // Solo mostrar la flecha de rendimiento de hoy — sin subtexto fijo
+                sub: null,
+                color: isGrowing ? 'text-green-500' : 'text-green-600',
+                extra: isGrowing && (
+                  <span className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                    ↑ hoy: +{new Intl.NumberFormat('es-MX', {
+                      style: 'currency', currency: 'MXN',
+                      minimumFractionDigits: 5, maximumFractionDigits: 5,
+                    }).format(Math.max(0, yieldTodayMxnAnimado))}
+                  </span>
+                ),
               },
               {
-                label: t('snapshot.statProyeccion'),
-                val: formatCurrencyUsd(Number(proyeccion20)),
-                sub: t('snapshot.statProyeccionSub', { apy: userRate.toFixed(2) }),
+                label: 'Proyección 20 años',
+                val: formatCurrencyMxn(proyeccion20Mxn),
+                sub: `${userRate.toFixed(2)}% APY neto`,
                 color: 'text-yellow-500',
               },
               {
                 label: t('snapshot.statFecha'),
-                val: fechaRetiro ?? '—',
-                sub: t('snapshot.statFechaSub'),
+                val: fechaRetiroEstimada,
+                sub: metaSeleccionada?.nombre ?? 'Sin meta',
                 color: 'text-ink/60 dark:text-white/60',
               },
             ].map(stat => (
               <div key={stat.label} className="bg-white dark:bg-white/5 border border-ink/8 dark:border-white/8 rounded-2xl p-4">
                 <p className="text-xs text-ink/40 dark:text-white/40 mb-2">{stat.label}</p>
                 <p className={`text-base font-bold mb-1 ${stat.color}`}>{stat.val}</p>
-                <p className="text-xs text-ink/35 dark:text-white/35">{stat.sub}</p>
+                {stat.sub && <p className="text-xs text-ink/35 dark:text-white/35">{stat.sub}</p>}
+                {stat.extra}
               </div>
             ))}
           </div>
 
-          {/* ── Progreso ── */}
+          {/* Barra de progreso hacia meta seleccionada */}
           <div className="bg-white dark:bg-white/5 border border-ink/8 dark:border-white/8 rounded-2xl p-5">
             <div className="flex justify-between items-center mb-3">
               <span className="font-semibold text-ink dark:text-white text-sm">{t('snapshot.progresoTitulo')}</span>
-              <span className="text-xs text-ink/40 dark:text-white/40">{t('snapshot.progresoMeta', { val: formatCurrencyUsd(meta) })}</span>
+              <span className="text-xs text-ink/40 dark:text-white/40">Meta: {formatCurrencyMxn(metaMxn)}</span>
             </div>
             <div className="h-2 bg-ink/5 dark:bg-white/5 rounded-full mb-2 overflow-hidden">
               <div className="h-full bg-gradient-to-r from-brand-dark to-brand rounded-full transition-all duration-700"
-                style={{ width: `${Math.min((lockedBalance / meta) * 100, 100)}%` }} />
+                style={{ width: `${Math.min((lockedBalance / metaMxn) * 100, 100)}%` }} />
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-ink/40 dark:text-white/40">
-                {t('snapshot.progresoBloqueados', { val: formatCurrencyUsd(lockedBalance) })}
+                {formatCurrencyMxn(lockedBalanceMxn)} bloqueados
               </span>
               <span className="text-xs text-brand font-semibold">
-                {((lockedBalance / meta) * 100).toFixed(1)}%
+                {((lockedBalance / metaMxn) * 100).toFixed(1)}%
               </span>
             </div>
           </div>
 
-          {/* ── Tab bar ── */}
+          {/* Tab bar */}
           <div className="relative">
             <div className="absolute top-0 right-0 w-12 h-full bg-gradient-to-r from-transparent to-surface dark:to-[#0f0e0d] pointer-events-none z-10" />
             <div role="tablist" aria-label="Dashboard sections"
@@ -226,10 +386,11 @@ export function RetirementSnapshot() {
                   aria-selected={activeTab === tab.key}
                   aria-controls={`panel-${tab.key}`}
                   tabIndex={activeTab === tab.key ? 0 : -1}
-                  className={`shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap ${activeTab === tab.key
-                    ? 'bg-brand/10 border-brand/30 text-brand'
-                    : 'bg-transparent border-ink/10 dark:border-white/10 text-ink/40 dark:text-white/40 hover:text-ink/70 dark:hover:text-white/70 hover:border-ink/20 dark:hover:border-white/20'
-                    }`}
+                  className={`shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap ${
+                    activeTab === tab.key
+                      ? 'bg-brand/10 border-brand/30 text-brand'
+                      : 'bg-transparent border-ink/10 dark:border-white/10 text-ink/40 dark:text-white/40 hover:text-ink/70 dark:hover:text-white/70 hover:border-ink/20 dark:hover:border-white/20'
+                  }`}
                   onClick={() => setActiveTab(tab.key)}
                   onKeyDown={e => handleTabKeyDown(e, index)}>
                   {tab.label}
@@ -246,12 +407,12 @@ export function RetirementSnapshot() {
                 <h6 className="font-semibold text-ink dark:text-white mb-4">{t('snapshot.resumenTitulo')}</h6>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: t('snapshot.resumenRed'), val: 'Stellar Testnet' },
+                    { label: t('snapshot.resumenRed'), val: 'Etherfuse · Banxico' },
                     { label: t('snapshot.resumenProveedor'), val: 'Etherfuse CETES' },
                     { label: t('snapshot.resumenTasaBruta'), val: `${cetesRate.toFixed(2)}% APY` },
                     { label: t('snapshot.resumenTasaUsuario'), val: `${userRate.toFixed(2)}% APY` },
                     { label: t('snapshot.resumenComision'), val: `${platformRate.toFixed(2)}% APY` },
-                    { label: t('snapshot.resumenMinDeposito'), val: `$${MANANA_SEGURO_RATES.minDeposit} USDC` },
+                    { label: t('snapshot.resumenMinDeposito'), val: '$40 MXN' },
                     { label: t('snapshot.resumenPrestamo'), val: t('snapshot.resumenPrestamoVal', { pct: MANANA_SEGURO_RATES.loanMaxPct * 100 }) },
                     { label: t('snapshot.resumenIncentivo'), val: t('snapshot.resumenIncentivoVal') },
                   ].map(item => (
@@ -268,7 +429,7 @@ export function RetirementSnapshot() {
           {/* ── Panel: Historial ── */}
           {activeTab === 'historial' && (
             <div id="panel-historial" role="tabpanel" aria-labelledby="tab-historial">
-              <ContributionHistory walletAddress={address} lockedBalance={lockedBalance} depositCount={depositCount} />
+              <ContributionHistory />
             </div>
           )}
 
@@ -322,14 +483,14 @@ export function RetirementSnapshot() {
           {/* ── Panel: Préstamo ── */}
           {activeTab === 'prestamo' && (
             <div id="panel-prestamo" role="tabpanel" aria-labelledby="tab-prestamo">
-              <AutoloanCard lockedBalance={lockedBalance} walletAddress={address} />
+              <AutoloanCard lockedBalance={lockedBalance} walletAddress={null} />
             </div>
           )}
 
           {/* ── Panel: Referidos ── */}
           {activeTab === 'referidos' && (
             <div id="panel-referidos" role="tabpanel" aria-labelledby="tab-referidos">
-              <ReferralModule userName={address?.slice(0, 8) ?? 'usuario'} walletAddress={address} />
+              <ReferralModule userName={usuario?.nombre?.slice(0, 8) ?? 'usuario'} walletAddress={null} />
             </div>
           )}
 
@@ -377,15 +538,15 @@ export function RetirementSnapshot() {
                   </thead>
                   <tbody>
                     {[
-                      ['200', '$100K USDC', '$1,000'],
-                      ['1,000', '$500K USDC', '$5,000'],
-                      ['10,000', '$5M USDC', '$50,000'],
-                      ['50,000', '$25M USDC', '$250,000'],
+                      ['200', '$1.75M MXN', '$17,500'],
+                      ['1,000', '$8.75M MXN', '$87,500'],
+                      ['10,000', '$87.5M MXN', '$875,000'],
+                      ['50,000', '$437M MXN', '$4.37M'],
                     ].map(([u, a, i]) => (
                       <tr key={u} className="border-b border-ink/4 dark:border-white/4">
                         <td className="py-2.5 font-semibold text-ink dark:text-white">{u}</td>
                         <td className="py-2.5 text-ink/40 dark:text-white/40">{a}</td>
-                        <td className="py-2.5 text-green-600 font-semibold">{i} USDC</td>
+                        <td className="py-2.5 text-green-600 font-semibold">{i} MXN</td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,0 +1,8 @@
+{
+  "name": "manana-seguro-functions",
+  "type": "module",
+  "dependencies": {
+    "@stellar/stellar-sdk": "^12.3.0",
+    "@supabase/supabase-js": "^2.105.4"
+  }
+}

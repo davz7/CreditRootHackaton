@@ -1,9 +1,10 @@
 // ─── Mañana Seguro — Constantes del modelo de negocio ───────────────────────
 
 export const MANANA_SEGURO_RATES = {
-  cetesRate: 5.7,
-  userRate: 4.7,
-  platformRate: 1.0,
+  cetesRate: 6.5,        // tasa bruta actual de Banxico (CETES 28 días)
+  etherfuseSpread: 0.9,  // diferencial que aplica Etherfuse sobre CETES para calcular lo que recibe el usuario
+  userRate: 4.5,         // cetesRate - platformRate (lo que recibe el usuario)
+  platformRate: 1.0,     // comisión de Mañana Seguro
   platformRateFloor: 0.5,
   cetesFloorTrigger: 4.0,
   loanMaxPct: 0.30,
@@ -29,9 +30,11 @@ export const plannerDefaults = {
   incentiveScenario: 'fidelidad_constancia',
 }
 
+// NOTA: retirementStats.value se actualiza dinámicamente en HomeScreen
+// usando useEtherfuseRate() — este valor es solo el fallback inicial
 export const retirementStats = [
   { label: 'Mexicanos sin pensión', value: '32M', caption: 'Trabajadores informales sin acceso al sistema tradicional.', tone: 'accent' },
-  { label: 'Rendimiento vía Etherfuse', value: '4.7%', caption: 'APY en USDC que recibe el usuario. Respaldado por CETES.', tone: 'brand' },
+  { label: 'Rendimiento vía Etherfuse', value: '~5.5%', caption: 'APY en USDC que recibe el usuario. Respaldado por CETES.', tone: 'brand' },
   { label: 'Para empezar', value: '$2 USDC', caption: 'Depósito mínimo. Sin burocracia, sin banco, sin papeleo.', tone: 'green' },
 ]
 

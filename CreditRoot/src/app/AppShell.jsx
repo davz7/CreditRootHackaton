@@ -1,3 +1,4 @@
+// src/app/AppShell.jsx
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AppHeader } from '../components/layout/AppHeader'
@@ -5,10 +6,8 @@ import { AppFooter } from '../components/layout/AppFooter'
 import { LandingScreen } from '../screens/LandingScreen'
 import { AuthScreen } from '../screens/AuthScreen'
 import { HomeScreen } from '../screens/HomeScreen'
-import { PlannerScreen } from '../screens/PlannerScreen'
 import { DashboardScreen } from '../screens/DashboardScreen'
 import { WithdrawalScreen } from '../screens/WithdrawalScreen'
-import { usePollar } from '@pollar/react'
 
 function AppLayout({ usuario, onLogout }) {
   return (
@@ -16,11 +15,12 @@ function AppLayout({ usuario, onLogout }) {
       <AppHeader usuario={usuario} onLogout={onLogout} />
       <main>
         <Routes>
-          <Route path="/home" element={<HomeScreen usuario={usuario} />} />
-          <Route path="/dashboard" element={<DashboardScreen />} />
-          <Route path="/planner" element={<PlannerScreen />} />
+          <Route path="/home"       element={<HomeScreen usuario={usuario} />} />
+          <Route path="/dashboard"  element={<DashboardScreen />} />
           <Route path="/withdrawal" element={<WithdrawalScreen />} />
-          <Route path="*" element={<Navigate to="/home" replace />} />
+          {/* Simulador redirige al dashboard donde está integrado */}
+          <Route path="/planner"    element={<Navigate to="/dashboard" replace />} />
+          <Route path="*"           element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
       <AppFooter />
@@ -29,45 +29,64 @@ function AppLayout({ usuario, onLogout }) {
 }
 
 export function AppShell() {
-  const [usuario, setUsuario] = useState(null)
   const navigate = useNavigate()
 
-  const { walletAddress, isAuthenticated, logout } = usePollar()
-
-  function handleLogout() {
-    logout?.()
-    setUsuario(null)
-    navigate('/')
-  }
+  const [usuario, setUsuario] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ms_usuario')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
 
   useEffect(() => {
-    if (isAuthenticated && walletAddress) {
-      setUsuario({
-        nombre: walletAddress.slice(0, 8),
-        walletAddress: walletAddress,
-      })
-      navigate('/home')
+    function onStorage(e) {
+      if (e.key === 'ms_usuario') {
+        setUsuario(e.newValue ? JSON.parse(e.newValue) : null)
+      }
     }
-  }, [isAuthenticated, walletAddress])
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   function handleAuth(datos) {
     setUsuario(datos)
+    localStorage.setItem('ms_usuario', JSON.stringify(datos))
     navigate('/home')
   }
 
   function handleLogout() {
     setUsuario(null)
+    localStorage.removeItem('ms_usuario')
     navigate('/')
   }
 
+  const estaAutenticado = !!usuario
+
   return (
     <Routes>
-      <Route path="/" element={<LandingScreen onLogin={() => navigate('/login')} onRegister={() => navigate('/register')} />} />
-      <Route path="/login" element={<AuthScreen onAuth={handleAuth} onVolver={() => navigate('/')} />} />
+      <Route path="/" element={
+        <LandingScreen
+          onLogin={() => navigate('/login')}
+          onRegister={() => navigate('/login')}
+        />
+      } />
+      <Route path="/login" element={
+        estaAutenticado
+          ? <Navigate to="/home" replace />
+          : <AuthScreen onAuth={handleAuth} onVolver={() => navigate('/')} />
+      } />
+      <Route path="/register" element={
+        estaAutenticado
+          ? <Navigate to="/home" replace />
+          : <AuthScreen onAuth={handleAuth} onVolver={() => navigate('/')} />
+      } />
       <Route path="/*" element={
-        usuario || isAuthenticated
-          ? <AppLayout usuario={usuario ?? { nombre: walletAddress?.slice(0, 8), walletAddress }} onLogout={handleLogout} />
-          : <Navigate to="/" replace />
-      } />    </Routes>
+        estaAutenticado
+          ? <AppLayout usuario={usuario} onLogout={handleLogout} />
+          : <Navigate to="/login" replace />
+      } />
+    </Routes>
   )
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { MANANA_SEGURO_RATES } from '../data/retirementContent'
 
-const CACHE_KEY = 'manana_seguro_cetes_rate_v3'
-const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7 // 7 días
+const CACHE_KEY = 'manana_seguro_cetes_rate'
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24
 const FALLBACK_RATE = MANANA_SEGURO_RATES.cetesRate
 
 export function useEtherfuseRate() {
@@ -47,9 +47,15 @@ function buildState(cetesRate, isLive, lastUpdated, loading, error) {
     ? MANANA_SEGURO_RATES.platformRateFloor
     : MANANA_SEGURO_RATES.platformRate
 
+  // Tasa que realmente recibe el usuario:
+  // Banxico bruto − spread Etherfuse − comisión Mañana Seguro
+  const etherfuseRate = Math.max(0, cetesRate - MANANA_SEGURO_RATES.etherfuseSpread)
+  const userRate = Math.max(0, etherfuseRate - effectivePlatformRate)
+
   return {
-    cetesRate,
-    userRate: parseFloat(Math.max(0, cetesRate - effectivePlatformRate).toFixed(2)),
+    cetesRate,                                          // 6.49% bruto Banxico
+    etherfuseRate: parseFloat(etherfuseRate.toFixed(2)), // 5.59% lo que paga Etherfuse
+    userRate: parseFloat(userRate.toFixed(2)),           // 4.59% lo que recibe el usuario
     platformRate: effectivePlatformRate,
     isLive,
     lastUpdated,
